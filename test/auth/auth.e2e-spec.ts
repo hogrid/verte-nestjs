@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { useContainer } from 'class-validator';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { DataSource } from 'typeorm';
@@ -31,6 +32,9 @@ describe('Auth Module (e2e) - Laravel Compatibility Tests', () => {
 
     app = moduleFixture.createNestApplication();
 
+    // Enable class-validator to use NestJS dependency injection
+    useContainer(app.select(AppModule), { fallbackOnErrors: true });
+
     // Apply same validation pipe as production
     app.useGlobalPipes(
       new ValidationPipe({
@@ -54,6 +58,11 @@ describe('Auth Module (e2e) - Laravel Compatibility Tests', () => {
   afterAll(async () => {
     // Cleanup test data
     if (testUser) {
+      // Delete numbers first (foreign key constraint)
+      const numberRepository = dataSource.getRepository('numbers');
+      await numberRepository.delete({ user_id: testUser.id });
+
+      // Then delete user
       await dataSource.getRepository(User).delete({ id: testUser.id });
     }
     await app.close();
@@ -78,7 +87,7 @@ describe('Auth Module (e2e) - Laravel Compatibility Tests', () => {
       confirmed_mail: 1,
       active: 1,
       cel: '11999999999',
-      cpfCnpj: '12345678901',
+      cpfCnpj: '52998224725', // Valid CPF for testing
     });
 
     testUser = await userRepository.save(testUser);
@@ -159,8 +168,11 @@ describe('Auth Module (e2e) - Laravel Compatibility Tests', () => {
     });
 
     it('should reject inactive user account', async () => {
-      // Create inactive user
+      // Cleanup any existing inactive user first
       const userRepository = dataSource.getRepository(User);
+      await userRepository.delete({ email: 'inactive@verte.com' });
+
+      // Create inactive user
       const inactiveUser = userRepository.create({
         name: 'Inactive',
         email: 'inactive@verte.com',
@@ -234,15 +246,26 @@ describe('Auth Module (e2e) - Laravel Compatibility Tests', () => {
       last_name: 'User',
       email: 'newuser@verte.com',
       cel: '11987654321',
-      cpfCnpj: '12345678901',
+      cpfCnpj: '52998224725', // Valid CPF for testing
       password: 'password123',
       password_confirmation: 'password123',
     };
 
     afterEach(async () => {
-      // Cleanup created users
+      // Cleanup created users and their associated numbers
       const userRepository = dataSource.getRepository(User);
-      await userRepository.delete({ email: 'newuser@verte.com' });
+      const user = await userRepository.findOne({
+        where: { email: 'newuser@verte.com' },
+      });
+
+      if (user) {
+        // Delete numbers first (foreign key constraint)
+        const numberRepository = dataSource.getRepository('numbers');
+        await numberRepository.delete({ user_id: user.id });
+
+        // Then delete user
+        await userRepository.delete({ id: user.id });
+      }
     });
 
     it('should register new user successfully', async () => {

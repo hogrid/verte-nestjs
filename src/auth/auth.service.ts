@@ -77,7 +77,35 @@ export class AuthService {
 
     const token = this.jwtService.sign({ sub: user.id, email: user.email });
 
-    const userData = await this.buildUserResponse(user);
+    const responseUser = await this.buildUserResponse(user);
+
+    // Merge user basic data with additional data (matching Laravel format)
+    const userData = {
+      id: user.id,
+      name: user.name ?? '',
+      last_name: user.last_name ?? '',
+      email: user.email ?? '',
+      cel: user.cel ?? '',
+      cpfCnpj: user.cpfCnpj ?? '',
+      status: user.status ?? 'inactived',
+      profile: user.profile ?? 'user',
+      confirmed_mail: user.confirmed_mail ?? 0,
+      active: user.active ?? 0,
+      plan: responseUser.plan ?? {},
+      numbersConnected: responseUser.numbersConnected ?? 0,
+      totalNumber: responseUser.totalNumber ?? 0,
+      extraNumbers: responseUser.extraNumbers ?? 0,
+      numberActive: responseUser.numberActive ?? {},
+      serverType: responseUser.serverType ?? null,
+      config: responseUser.config ?? {},
+    };
+
+    // Ensure no null values for objects
+    ['plan', 'numberActive', 'config'].forEach((field: string) => {
+      if (userData[field] === null) {
+        userData[field] = {};
+      }
+    });
 
     return {
       expiresIn: 60 * 60, // 1 hour
