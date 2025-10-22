@@ -26,9 +26,6 @@ export class Configuration {
   @Column({ type: 'int', default: 30 })
   timer_delay: number;
 
-  @Column({ type: 'text', nullable: true })
-  ddds: string | null;
-
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
 

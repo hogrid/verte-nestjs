@@ -41,26 +41,32 @@ export class Number {
   @Column({ type: 'varchar', length: 255, nullable: true })
   cel: string | null;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'text', nullable: true })
   photo: string | null;
 
-  @Column({ type: 'text', nullable: true })
-  extra: string | null;
+  @Column({ type: 'int', nullable: true, default: 0 })
+  chat_sync: number;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
+  @Column({ type: 'tinyint', nullable: true })
+  extra: number | null;
+
+  @Column({ type: 'varchar', length: 250, nullable: true })
   token_wpp: string | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'datetime', nullable: true })
   token_wpp_expiresin: Date | null;
 
-  @Column({ type: 'date', nullable: true })
-  last_sync: Date | null;
+  @Column({ type: 'text', nullable: true })
+  qrcode: string | null;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  stripe_code: string | null;
+  @Column({ type: 'timestamp', nullable: true })
+  last_sync: Date | null;
 
   @Column({ type: 'date', nullable: true })
   canceled_at: Date | null;
+
+  @Column({ type: 'tinyint', nullable: true, default: 0 })
+  labels_active: number;
 
   @CreateDateColumn({ type: 'timestamp' })
   created_at: Date;
