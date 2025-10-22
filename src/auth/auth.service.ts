@@ -101,9 +101,10 @@ export class AuthService {
     };
 
     // Ensure no null values for objects
-    ['plan', 'numberActive', 'config'].forEach((field: string) => {
-      if (userData[field] === null) {
-        userData[field] = {};
+    const fieldsToCheck = ['plan', 'numberActive', 'config'] as const;
+    fieldsToCheck.forEach((field) => {
+      if ((userData as any)[field] === null) {
+        (userData as any)[field] = {};
       }
     });
 
@@ -329,7 +330,8 @@ export class AuthService {
     };
 
     // Ensure no null values for objects
-    ['plan', 'numberActive', 'config'].forEach((field: string) => {
+    const fieldsToCheck = ['plan', 'numberActive', 'config'] as const;
+    fieldsToCheck.forEach((field) => {
       if (data[field] === null) {
         data[field] = {};
       }

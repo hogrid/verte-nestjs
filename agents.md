@@ -1,6 +1,6 @@
-# CLAUDE.md
+# agents.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI agents when working with code in this repository.
 
 ## 🚨 REGRA CRÍTICA - LEIA PRIMEIRO
 
@@ -433,6 +433,360 @@ export class CreateUserDto {
 - Todas as mensagens devem ser IDÊNTICAS ao Laravel
 - Usar mesma estrutura de erro: `{ message, errors }`
 - Status codes idênticos: 422 para validação
+
+---
+
+## API Documentation (Swagger/OpenAPI)
+
+### Padrão OBRIGATÓRIO de Documentação
+
+**TODOS os endpoints DEVEM ser documentados usando Swagger/OpenAPI.**
+
+A documentação interativa está disponível em: `http://localhost:3000/api/docs`
+
+### Controller Documentation Pattern
+
+```typescript
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+} from '@nestjs/swagger';
+
+// OBRIGATÓRIO: Tag para agrupar endpoints
+@ApiTags('NomeDoModulo')
+@Controller('api/v1')
+export class ExemploController {
+
+  @Post('criar')
+  @HttpCode(HttpStatus.CREATED)
+
+  // OBRIGATÓRIO: Descrição do endpoint
+  @ApiOperation({
+    summary: 'Criar novo recurso',
+    description: 'Descrição detalhada do que o endpoint faz e suas regras de negócio.',
+  })
+
+  // OBRIGATÓRIO para POST/PUT/PATCH: Especificar DTO
+  @ApiBody({ type: CriarRecursoDto })
+
+  // OBRIGATÓRIO: Response de sucesso
+  @ApiResponse({
+    status: 201,
+    description: 'Recurso criado com sucesso',
+    schema: {
+      example: {
+        message: 'Recurso criado com sucesso',
+        data: {
+          id: 1,
+          nome: 'Exemplo',
+          created_at: '2024-10-22T10:00:00Z',
+        },
+      },
+    },
+  })
+
+  // OBRIGATÓRIO: Response de erro (mínimo 1)
+  @ApiResponse({
+    status: 400,
+    description: 'Erro de validação',
+    schema: {
+      example: {
+        message: 'Os dados fornecidos são inválidos.',
+        error: 'Bad Request',
+        statusCode: 400,
+      },
+    },
+  })
+
+  // OBRIGATÓRIO se endpoint protegido: Autenticação JWT
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(JwtAuthGuard)
+  async criar(@Body() dto: CriarRecursoDto) {
+    return this.service.criar(dto);
+  }
+}
+```
+
+### DTO Documentation Pattern
+
+```typescript
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class CriarRecursoDto {
+  // OBRIGATÓRIO: Documentar todos os campos
+  @ApiProperty({
+    description: 'Nome do recurso',
+    example: 'Exemplo de Nome',  // SEMPRE usar exemplos realistas
+    type: String,
+    minLength: 3,
+    maxLength: 100,
+  })
+  @IsNotEmpty({ message: 'O campo nome é obrigatório.' })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(100)
+  nome: string;
+
+  // Para campos opcionais, usar ApiPropertyOptional
+  @ApiPropertyOptional({
+    description: 'Descrição opcional do recurso',
+    example: 'Esta é uma descrição de exemplo',
+    type: String,
+  })
+  @IsOptional()
+  @IsString()
+  descricao?: string;
+
+  // Para enums, especificar valores possíveis
+  @ApiProperty({
+    description: 'Status do recurso',
+    enum: ['actived', 'inactived', 'pending'],
+    example: 'actived',
+    type: String,
+  })
+  @IsNotEmpty({ message: 'O campo status é obrigatório.' })
+  @IsEnum(['actived', 'inactived', 'pending'])
+  status: string;
+
+  // Para números
+  @ApiProperty({
+    description: 'ID do usuário proprietário',
+    example: 1,
+    type: Number,
+    minimum: 1,
+  })
+  @IsNotEmpty({ message: 'O campo user_id é obrigatório.' })
+  @IsNumber()
+  @Min(1)
+  user_id: number;
+}
+```
+
+### Documentation Checklist (OBRIGATÓRIO)
+
+Antes de considerar um endpoint completo, verificar:
+
+- [ ] **@ApiTags** no controller (para agrupamento)
+- [ ] **@ApiOperation** com `summary` e `description` descritivas
+- [ ] **@ApiBody** se endpoint POST/PUT/PATCH
+- [ ] **@ApiResponse** para status de sucesso (200/201)
+- [ ] **@ApiResponse** para TODOS os status de erro possíveis (400/401/404/422)
+- [ ] **@ApiBearerAuth('JWT-auth')** se endpoint protegido
+- [ ] **@ApiProperty** em TODOS os campos do DTO (obrigatórios)
+- [ ] **@ApiPropertyOptional** em campos opcionais do DTO
+- [ ] **Exemplos realistas** (não usar "string", "123", etc)
+- [ ] **Descrições em português** (compatibilidade com Laravel)
+- [ ] **Testado na interface Swagger** (http://localhost:3000/api/docs)
+
+### Exemplos Realistas vs Inválidos
+
+❌ **NÃO FAÇA** (exemplos genéricos):
+```typescript
+@ApiProperty({
+  example: 'string',  // ❌ Muito genérico
+})
+name: string;
+
+@ApiProperty({
+  example: 123,  // ❌ Não realista
+})
+id: number;
+
+@ApiProperty({
+  example: {},  // ❌ Objeto vazio
+})
+data: object;
+```
+
+✅ **FAÇA** (exemplos realistas):
+```typescript
+@ApiProperty({
+  example: 'João Silva',  // ✅ Nome realista
+})
+name: string;
+
+@ApiProperty({
+  example: 1,  // ✅ ID realista
+})
+id: number;
+
+@ApiProperty({
+  example: {  // ✅ Objeto com dados reais
+    id: 1,
+    name: 'João Silva',
+    email: 'joao.silva@exemplo.com',
+  },
+})
+userData: UserData;
+
+@ApiProperty({
+  example: '52998224725',  // ✅ CPF válido
+})
+cpfCnpj: string;
+
+@ApiProperty({
+  example: 'joao.silva@exemplo.com',  // ✅ Email realista
+})
+email: string;
+```
+
+### Response Documentation Standards
+
+**Success Response (200/201):**
+```typescript
+@ApiResponse({
+  status: 200,
+  description: 'Operação realizada com sucesso',
+  schema: {
+    example: {
+      message: 'Operação realizada com sucesso',
+      data: {
+        // Exemplo COMPLETO da estrutura de dados retornada
+        id: 1,
+        name: 'Exemplo',
+        status: 'actived',
+        created_at: '2024-10-22T10:00:00Z',
+      },
+    },
+  },
+})
+```
+
+**Error Response (400/401/404/422):**
+```typescript
+@ApiResponse({
+  status: 422,
+  description: 'Erro de validação',
+  schema: {
+    example: {
+      message: 'Os dados fornecidos são inválidos.',
+      errors: {
+        email: ['O campo email é obrigatório.'],
+        password: ['O campo password deve ter no mínimo 8 caracteres.'],
+      },
+      statusCode: 422,
+    },
+  },
+})
+
+@ApiResponse({
+  status: 401,
+  description: 'Usuário não autenticado',
+  schema: {
+    example: {
+      message: 'Token inválido ou expirado',
+      error: 'Unauthorized',
+      statusCode: 401,
+    },
+  },
+})
+
+@ApiResponse({
+  status: 404,
+  description: 'Recurso não encontrado',
+  schema: {
+    example: {
+      message: 'Recurso não encontrado',
+      error: 'Not Found',
+      statusCode: 404,
+    },
+  },
+})
+```
+
+### Protected Endpoints (JWT Authentication)
+
+Para endpoints que requerem autenticação:
+
+```typescript
+@Get('perfil')
+@UseGuards(JwtAuthGuard)  // Guard de autenticação
+@ApiBearerAuth('JWT-auth')  // OBRIGATÓRIO: Documentar autenticação
+@ApiOperation({
+  summary: 'Obter perfil do usuário',
+  description: 'Retorna os dados completos do usuário autenticado.',
+})
+@ApiResponse({ status: 200, description: 'Dados do usuário' })
+@ApiResponse({
+  status: 401,
+  description: 'Token inválido ou expirado',
+  schema: {
+    example: {
+      message: 'Token inválido ou expirado',
+      error: 'Unauthorized',
+      statusCode: 401,
+    },
+  },
+})
+async getPerfil(@Request() req) {
+  return this.userService.findById(req.user.id);
+}
+```
+
+### Swagger Configuration (main.ts)
+
+A configuração já está em `src/main.ts`. Ao adicionar novos módulos, atualize as tags:
+
+```typescript
+const config = new DocumentBuilder()
+  .setTitle('Verte API - NestJS')
+  .setDescription('API de automação de marketing via WhatsApp')
+  .setVersion('1.0.0')
+  .addTag('Auth', 'Autenticação e gerenciamento de sessão')
+  .addTag('Campaigns', 'Gerenciamento de campanhas de marketing')  // Adicionar novas tags
+  .addTag('Contacts', 'Gerenciamento de contatos')
+  .addTag('WhatsApp', 'Integração com WhatsApp via WAHA')
+  // ... adicionar tags conforme necessário
+  .addBearerAuth({
+    type: 'http',
+    scheme: 'bearer',
+    bearerFormat: 'JWT',
+    name: 'JWT',
+    description: 'Token JWT obtido via /api/v1/login',
+    in: 'header',
+  }, 'JWT-auth')
+  .build();
+```
+
+### Validation and Testing
+
+**Após documentar um endpoint:**
+
+1. Inicie o servidor: `npm run start:dev`
+2. Acesse: http://localhost:3000/api/docs
+3. Verifique se o endpoint aparece corretamente
+4. Teste o endpoint diretamente no Swagger (botão "Try it out")
+5. Valide se os exemplos funcionam
+6. Confirme que as validações estão corretas
+7. Verifique se as mensagens de erro estão em português
+
+### Compatibilidade com Laravel
+
+A documentação deve refletir a **mesma estrutura de responses** do Laravel:
+
+```typescript
+// Laravel Response Structure
+{
+  "message": "Operação realizada com sucesso",  // Mensagem em português
+  "data": { ... }  // Estrutura idêntica ao Laravel
+}
+
+// Laravel Validation Error Structure
+{
+  "message": "Os dados fornecidos são inválidos.",
+  "errors": {
+    "field": ["Mensagem de erro em português"]
+  },
+  "statusCode": 422
+}
+```
+
+### Documentation Standards Reference
+
+Consulte: `docs/swagger-standards.md` para referência completa.
 
 ---
 

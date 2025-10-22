@@ -264,6 +264,84 @@ npm run test:diff-report
 
 ---
 
+## 📖 Documentação Swagger/OpenAPI
+
+### Acesso à Documentação Interativa
+
+**URL**: http://localhost:3000/api/docs
+
+A API possui documentação completa e interativa usando Swagger/OpenAPI onde você pode:
+- Ver todos os endpoints disponíveis
+- Testar endpoints diretamente no navegador
+- Ver exemplos de requests e responses
+- Entender validações e tipos de dados
+
+### Padrões de Documentação (OBRIGATÓRIO)
+
+**Todos os novos endpoints DEVEM ser documentados seguindo o padrão**:
+
+#### Controller
+```typescript
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+
+@ApiTags('NomeDoModulo')  // OBRIGATÓRIO
+@Controller('api/v1')
+export class ExemploController {
+  @Post('criar')
+  @ApiOperation({
+    summary: 'Título curto',
+    description: 'Descrição detalhada do endpoint',
+  })
+  @ApiBody({ type: SeuDto })
+  @ApiResponse({ status: 200, description: 'Sucesso' })
+  @ApiResponse({ status: 400, description: 'Erro de validação' })
+  async criar(@Body() dto: SeuDto) {
+    // ...
+  }
+}
+```
+
+#### DTOs
+```typescript
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export class SeuDto {
+  @ApiProperty({
+    description: 'Descrição do campo',
+    example: 'valor-exemplo-realista',
+    type: String,
+  })
+  @IsNotEmpty()
+  campo: string;
+
+  @ApiPropertyOptional({
+    description: 'Campo opcional',
+    example: 'valor',
+  })
+  @IsOptional()
+  campoOpcional?: string;
+}
+```
+
+### Checklist de Documentação
+
+Antes de considerar um endpoint completo:
+
+- [ ] `@ApiTags` no controller
+- [ ] `@ApiOperation` com summary e description
+- [ ] `@ApiBody` se POST/PUT/PATCH
+- [ ] `@ApiResponse` para status 200/201
+- [ ] `@ApiResponse` para status de erro (400/401/404)
+- [ ] `@ApiBearerAuth` se protegido por JWT
+- [ ] Todos os campos do DTO têm `@ApiProperty`
+- [ ] Exemplos são realistas e funcionam
+- [ ] Descrições em português
+- [ ] Testado na interface Swagger
+
+**Documento completo**: [docs/swagger-standards.md](./docs/swagger-standards.md)
+
+---
+
 ## 📖 Scripts Disponíveis
 
 ```bash
