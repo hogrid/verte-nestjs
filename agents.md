@@ -406,6 +406,539 @@ async login(@Body() loginDto: LoginDto) {
 
 ---
 
+## Code Review & Validation Process
+
+### CRITICAL: Systematic Code Review Workflow
+
+Before marking any module or endpoint as "complete", ALWAYS execute this systematic review process. This ensures 100% Laravel compatibility and prevents enum mismatches, missing fields, and documentation gaps.
+
+#### Step-by-Step Review Checklist
+
+##### 1. Laravel Source Analysis
+
+```bash
+# Mandatory first step: Study the Laravel original code
+1. Open ../verte-back/app/Http/Controllers/[Controller].php
+2. Identify ALL table columns from Model and migrations
+3. List all fields validated in FormRequest or Controller
+4. Document fields set automatically by the system
+5. Note enum values EXACTLY as they appear in Laravel
+6. Understand complete business logic flow
+```
+
+**Example: Reviewing User Registration**
+```php
+// Laravel: ../verte-back/app/Services/UserService.php
+User::create([
+    'name' => $request->name,
+    'email' => $request->email,
+    'cpfCnpj' => $request->cpfCnpj,
+    'cel' => $request->cel,
+    'status' => 1,                    // Auto-set: always 1 (actived)
+    'confirmed_mail' => 1,            // Auto-set: always 1
+    'password' => Hash::make($request->password),
+    'profile' => $request->has('permission') ? $request->permission : 'user',
+    'active' => 0                     // Auto-set: always 0
+]);
+
+// KEY FINDINGS:
+// - 'profile' accepts: 'user' OR 'administrator' (NOT 'admin')
+// - Auto-set fields: status=1, confirmed_mail=1, active=0
+// - plan_id NOT set (remains null until user selects plan)
+```
+
+##### 2. Enum Validation (CRITICAL)
+
+**Why This Matters:**
+- Mismatched enum values cause runtime failures
+- Documentation shows wrong acceptable values
+- Validation rejects valid requests
+
+**Validation Process:**
+
+```typescript
+// Step 1: Find enum values in Laravel
+// Laravel Model or Controller: 'profile' => 'user' or 'administrator'
+
+// Step 2: Create TypeORM enum with EXACT values
+export enum UserProfile {
+  USER = 'user',                    // ✅ Exact match
+  ADMINISTRATOR = 'administrator',  // ✅ Exact match (NOT 'admin')
+}
+
+// Step 3: Verify in DTO
+@ApiProperty({
+  enum: UserProfile,                 // ✅ Use TypeScript enum
+  example: UserProfile.USER,         // ✅ Use enum value
+})
+@IsEnum(UserProfile, {               // ✅ Add enum validator
+  message: 'Must be "user" or "administrator"'
+})
+permission?: UserProfile;            // ✅ Type-safe
+
+// ❌ COMMON MISTAKE: Hardcoded wrong values
+enum: ['admin', 'user']  // Wrong! Laravel uses 'administrator'
+```
+
+**Enum Validation Checklist:**
+- [ ] Check Laravel source for exact enum values
+- [ ] Verify values in database table (if accessible)
+- [ ] Create TypeORM enum with exact values
+- [ ] Use enum in Entity definition
+- [ ] Import and use enum in DTOs (not string arrays)
+- [ ] Add @IsEnum validator in DTOs
+- [ ] Document enum values in Swagger with correct names
+
+##### 3. Automatic Fields Detection
+
+Many fields are set automatically by the system and should NOT be in DTOs.
+
+**Identification Process:**
+
+```typescript
+// In Laravel Controller/Service, look for:
+User::create([
+    'field' => $request->field,  // ← User-provided field (goes in DTO)
+    'status' => 1,               // ← Auto-set field (NOT in DTO)
+    'active' => 0,               // ← Auto-set field (NOT in DTO)
+]);
+
+// Common automatic fields:
+// - status, active: Set by business logic
+// - confirmed_mail: Set during registration
+// - plan_id: Set later when user selects plan
+// - created_at, updated_at: Database timestamps
+// - deleted_at: Soft delete timestamp
+```
+
+**Checklist for Automatic Fields:**
+- [ ] Identify all auto-set fields in Laravel
+- [ ] Exclude from DTO (should NOT be in request body)
+- [ ] Document in DTO JSDoc comment
+- [ ] Set correctly in Service implementation
+- [ ] Document in Swagger description (@ApiOperation)
+
+**Documentation Example:**
+
+```typescript
+/**
+ * Register DTO
+ *
+ * Fields set automatically by system (DO NOT send in request):
+ * - status: 'actived' (user created as active)
+ * - confirmed_mail: 1 (email considered confirmed)
+ * - active: 0 (awaiting activation/payment)
+ * - plan_id: null (set when user selects plan)
+ * - created_at, updated_at: automatic timestamps
+ */
+export class RegisterDto {
+  // Only user-provided fields here
+}
+```
+
+##### 4. DTO Validation
+
+**Complete DTO Review Process:**
+
+```typescript
+// Step 1: List ALL table columns
+// Table 'users': id, name, last_name, email, cel, cpfCnpj, password,
+//                status, profile, confirmed_mail, active, plan_id, ...
+
+// Step 2: Categorize fields:
+
+// A) Required from user (mandatory in DTO):
+@ApiProperty({ required: true, example: 'João Silva' })
+@IsNotEmpty({ message: 'O campo nome é obrigatório.' })
+name: string;
+
+// B) Optional from user (optional in DTO):
+@ApiPropertyOptional({ required: false, example: 'Silva' })
+@IsOptional()
+last_name?: string;
+
+// C) Auto-set by system (NOT in DTO, document in JSDoc):
+// - status: UserStatus.ACTIVED
+// - confirmed_mail: 1
+// - active: 0
+
+// Step 3: Add proper validators
+@IsEmail({}, { message: 'Email inválido.' })
+@IsUnique('users', 'email')  // Custom validator
+email: string;
+
+// Step 4: For enums, use @IsEnum
+@IsEnum(UserProfile, {
+  message: 'Deve ser "user" ou "administrator"'
+})
+permission?: UserProfile;
+```
+
+**DTO Checklist:**
+- [ ] All user-provided fields included
+- [ ] Auto-set fields excluded and documented
+- [ ] Proper validators (@IsNotEmpty, @IsEmail, @IsEnum, etc)
+- [ ] Custom validators where needed (@IsUnique, @IsCpfOrCnpj)
+- [ ] All fields have @ApiProperty or @ApiPropertyOptional
+- [ ] Realistic examples (not "string", "123")
+- [ ] Descriptions in Portuguese (Laravel compatibility)
+- [ ] Enum fields use TypeScript enums, not string arrays
+
+##### 5. Service Implementation
+
+**Service Review Checklist:**
+
+```typescript
+// Compare line-by-line with Laravel Service/Controller
+async register(dto: RegisterDto) {
+  // ✅ CORRECT: Use enum constants
+  const user = this.userRepository.create({
+    name: dto.name,
+    email: dto.email,
+    status: UserStatus.ACTIVED,              // ✅ Type-safe enum
+    profile: dto.permission || UserProfile.USER,  // ✅ Type-safe enum
+    confirmed_mail: 1,                       // ✅ Auto-set
+    active: 0,                               // ✅ Auto-set
+    password: await bcrypt.hash(dto.password, 10),
+  });
+
+  // ❌ WRONG: Hardcoded strings
+  const user = this.userRepository.create({
+    name: dto.name,
+    status: 'actived',                       // ❌ No type safety
+    profile: dto.permission || 'user',       // ❌ No type safety
+  });
+
+  // Verify related records are created (like Laravel)
+  const number = this.numberRepository.create({
+    user_id: user.id,
+    name: 'Número Principal',
+    // ... (matching Laravel logic)
+  });
+
+  return { message: 'Cadastro realizado com sucesso', data: user };
+}
+```
+
+**Service Validation Checklist:**
+- [ ] Business logic identical to Laravel
+- [ ] All auto-set fields properly configured
+- [ ] Enums used instead of hardcoded strings
+- [ ] Related records created (Numbers, Configurations, etc)
+- [ ] Response structure matches Laravel exactly
+- [ ] Error messages in Portuguese
+- [ ] Same status codes (200, 422, etc)
+
+##### 6. Swagger Documentation
+
+**Complete Documentation Checklist:**
+
+**Controller Level:**
+```typescript
+@ApiTags('Auth')  // ✅ Required for grouping
+@Controller('api/v1')
+export class AuthController {
+
+  @Post('register')
+  @ApiOperation({
+    summary: 'Registro de novo usuário',
+    description:
+      'Creates new user account with full validation.\n\n' +
+      '**Automatic validations:**\n' +
+      '- Unique email\n' +
+      '- Valid CPF/CNPJ\n' +
+      '- Password min 8 chars\n\n' +
+      '**System auto-sets:**\n' +
+      '- status: "actived"\n' +
+      '- confirmed_mail: 1\n' +
+      '- active: 0\n' +
+      '- plan_id: null\n' +
+      '- Creates WhatsApp instance (Number)',
+  })
+  @ApiBody({ type: RegisterDto })  // ✅ Specify DTO
+  @ApiResponse({
+    status: 200,
+    description: 'User registered successfully',
+    schema: {
+      example: {  // ✅ Complete realistic example
+        message: 'Cadastro realizado com sucesso',
+        data: {
+          id: 1,
+          name: 'João Silva',
+          email: 'joao@exemplo.com',
+          status: 'actived',
+          profile: 'user',
+          confirmed_mail: 1,
+          active: 0,
+          plan_id: null,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'Validation error',
+    schema: {
+      example: {  // ✅ Laravel error structure
+        errors: {
+          email: ['Este email já foi cadastrado.'],
+          password: ['A senha deve ter no mínimo 8 caracteres.'],
+        },
+      },
+    },
+  })
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
+}
+```
+
+**DTO Level:**
+```typescript
+export class RegisterDto {
+  @ApiProperty({
+    description: 'User full name (required)',
+    example: 'João Silva',        // ✅ Realistic, not "string"
+    type: String,
+    required: true,
+    minLength: 2,
+    maxLength: 255,
+  })
+  @IsNotEmpty({ message: 'O campo nome é obrigatório.' })
+  name: string;
+
+  @ApiProperty({
+    description: 'Valid Brazilian CPF (11 digits) or CNPJ (14 digits)',
+    example: '52998224725',       // ✅ Valid CPF example
+    type: String,
+  })
+  @IsCpfOrCnpj()
+  cpfCnpj: string;
+
+  @ApiPropertyOptional({
+    description: 'User permission level',
+    enum: UserProfile,             // ✅ Use TypeScript enum
+    enumName: 'UserProfile',       // ✅ Enum name for docs
+    example: UserProfile.USER,     // ✅ Use enum value
+    default: UserProfile.USER,
+  })
+  @IsOptional()
+  @IsEnum(UserProfile, {
+    message: 'Must be "user" or "administrator"'
+  })
+  permission?: UserProfile;
+}
+```
+
+**Swagger Documentation Checklist:**
+- [ ] @ApiTags on controller
+- [ ] @ApiOperation with summary and detailed description
+- [ ] @ApiBody for POST/PUT/PATCH endpoints
+- [ ] @ApiResponse for success (200/201)
+- [ ] @ApiResponse for ALL possible errors (400/401/404/422)
+- [ ] @ApiBearerAuth if endpoint requires authentication
+- [ ] @ApiProperty on all required DTO fields
+- [ ] @ApiPropertyOptional on all optional DTO fields
+- [ ] Realistic examples (not generic "string", "123")
+- [ ] Descriptions in Portuguese
+- [ ] Enum documentation uses TypeScript enums
+- [ ] Auto-set fields documented in description
+
+##### 7. Testing & Verification
+
+**Mandatory Testing Steps:**
+
+```bash
+# 1. TypeScript compilation
+npm run build
+# Must complete without errors
+
+# 2. Start development server
+npm run start:dev
+
+# 3. Access Swagger documentation
+open http://localhost:3000/api/docs
+
+# 4. Manual testing in Swagger:
+# - Locate the endpoint
+# - Click "Try it out"
+# - Test with valid data → Should succeed
+# - Test with invalid enum → Should fail with proper message
+# - Verify response structure matches Laravel
+# - Confirm error messages in Portuguese
+
+# 5. Run E2E tests
+npm run test:e2e
+# All compatibility tests must pass
+```
+
+**Testing Checklist:**
+- [ ] `npm run build` succeeds without errors
+- [ ] Endpoint appears in Swagger UI
+- [ ] "Try it out" works with provided examples
+- [ ] Valid enum values accepted
+- [ ] Invalid enum values rejected with clear message
+- [ ] Response structure identical to Laravel
+- [ ] Error messages in Portuguese
+- [ ] E2E tests pass
+
+### Real-World Review Example
+
+**Scenario:** Reviewing POST /api/v1/register endpoint
+
+#### Discovery Process
+
+**Problem Found:** RegisterDto documented enum as `['admin', 'user']` but Laravel uses `'administrator'`, not `'admin'`.
+
+**Step 1: Laravel Analysis**
+```php
+// ../verte-back/app/Services/UserService.php line 60
+'profile' => $request->has('permission') ? $request->permission : 'user'
+
+// Values used in Laravel: 'user' or 'administrator'
+```
+
+**Step 2: Entity Verification**
+```typescript
+// src/database/entities/user.entity.ts
+export enum UserProfile {
+  USER = 'user',                    // ✅ Correct
+  ADMINISTRATOR = 'administrator',  // ✅ Correct
+}
+// Entity enum was correct!
+```
+
+**Step 3: DTO Issue Found**
+```typescript
+// src/auth/dto/register.dto.ts (BEFORE)
+@ApiPropertyOptional({
+  enum: ['admin', 'user'],  // ❌ WRONG! Uses 'admin' instead of 'administrator'
+})
+@IsString()  // ❌ No enum validation
+permission?: string;  // ❌ Generic string type
+```
+
+**Step 4: Fixes Applied**
+```typescript
+// src/auth/dto/register.dto.ts (AFTER)
+import { UserProfile } from '../entities/user.entity';
+
+@ApiPropertyOptional({
+  enum: UserProfile,              // ✅ Use TypeScript enum
+  enumName: 'UserProfile',
+  example: UserProfile.USER,
+})
+@IsOptional()
+@IsEnum(UserProfile, {            // ✅ Add enum validator
+  message: 'Must be "user" or "administrator"'
+})
+permission?: UserProfile;         // ✅ Type-safe
+```
+
+**Step 5: Service Update**
+```typescript
+// src/auth/auth.service.ts (BEFORE)
+profile: (dto.permission as any) || 'user',  // ❌ Unsafe cast
+
+// AFTER
+import { UserProfile } from '../entities/user.entity';
+profile: dto.permission || UserProfile.USER,  // ✅ Type-safe
+```
+
+**Step 6: Verification**
+```bash
+npm run build  # ✅ No errors
+# Test in Swagger:
+# - permission: "user" → ✅ Accepted
+# - permission: "administrator" → ✅ Accepted
+# - permission: "admin" → ❌ Rejected with error message
+```
+
+### Common Issues & Solutions
+
+#### Issue 1: Enum Value Mismatch
+```typescript
+// ❌ PROBLEM
+enum: ['admin', 'user']  // Laravel uses 'administrator'
+
+// ✅ SOLUTION
+export enum UserProfile {
+  USER = 'user',
+  ADMINISTRATOR = 'administrator',  // Exact Laravel value
+}
+enum: UserProfile
+```
+
+#### Issue 2: Missing Enum Validation
+```typescript
+// ❌ PROBLEM
+@IsString()
+permission?: string;  // Accepts any string
+
+// ✅ SOLUTION
+@IsEnum(UserProfile, {
+  message: 'Must be "user" or "administrator"'
+})
+permission?: UserProfile;
+```
+
+#### Issue 3: Incomplete Swagger Documentation
+```typescript
+// ❌ PROBLEM
+@ApiProperty({ example: 'string' })  // Generic example
+name: string;
+
+// ✅ SOLUTION
+@ApiProperty({
+  description: 'User full name (required)',
+  example: 'João Silva',  // Realistic
+  type: String,
+  required: true,
+})
+name: string;
+```
+
+#### Issue 4: Missing Auto-Set Fields Documentation
+```typescript
+// ❌ PROBLEM
+export class RegisterDto { ... }  // No documentation
+
+// ✅ SOLUTION
+/**
+ * Fields set automatically (DO NOT send):
+ * - status: 'actived'
+ * - confirmed_mail: 1
+ * - active: 0
+ * - plan_id: null
+ */
+export class RegisterDto { ... }
+```
+
+### Final Validation Checklist
+
+**Before marking module/endpoint as COMPLETE:**
+
+- [ ] Laravel code analyzed line-by-line
+- [ ] All enum values verified against Laravel source
+- [ ] Entity enums match database exactly
+- [ ] DTO includes all required fields
+- [ ] DTO excludes all auto-set fields
+- [ ] Auto-set fields documented in JSDoc
+- [ ] All enum fields use @IsEnum validator
+- [ ] Service uses type-safe enums (not strings)
+- [ ] Service logic matches Laravel exactly
+- [ ] Controller has complete @ApiOperation
+- [ ] All DTO fields have @ApiProperty/@ApiPropertyOptional
+- [ ] Examples are realistic and valid
+- [ ] Descriptions in Portuguese
+- [ ] `npm run build` succeeds
+- [ ] Swagger UI tested manually
+- [ ] E2E tests pass
+
+**If ANY item fails, code is NOT complete.**
+
+---
+
 ## Validation Rules
 
 ### Compatibilidade de Validações (CRÍTICO)

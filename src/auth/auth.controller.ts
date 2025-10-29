@@ -134,7 +134,28 @@ export class AuthController {
   @ApiOperation({
     summary: 'Registro de novo usuário',
     description:
-      'Cria uma nova conta de usuário com validações completas (email único, CPF/CNPJ válido).',
+      'Cria uma nova conta de usuário com validações completas.\n\n' +
+      '**Validações automáticas:**\n' +
+      '- Email único no sistema (não pode estar em uso)\n' +
+      '- CPF ou CNPJ válido (validação brasileira)\n' +
+      '- Senha mínima de 8 caracteres\n' +
+      '- Confirmação de senha idêntica\n\n' +
+      '**O sistema cria automaticamente:**\n' +
+      '- `status: "actived"` - Usuário criado como ativo\n' +
+      '- `confirmed_mail: 1` - Email considerado confirmado\n' +
+      '- `active: 0` - Aguardando ativação/pagamento de plano\n' +
+      '- `plan_id: null` - Será definido quando usuário escolher um plano\n' +
+      '- `profile: "user"` - Perfil padrão (ou "administrator" se informado)\n' +
+      '- Uma instância WhatsApp (Number) com nome baseado no celular\n\n' +
+      '**Campos aceitos no body:**\n' +
+      '- name (obrigatório)\n' +
+      '- last_name (opcional)\n' +
+      '- email (obrigatório, único)\n' +
+      '- cel (obrigatório)\n' +
+      '- cpfCnpj (obrigatório, válido)\n' +
+      '- password (obrigatório, min 8 chars)\n' +
+      '- password_confirmation (obrigatório, igual password)\n' +
+      '- permission (opcional: "user" ou "administrator")',
   })
   @ApiBody({ type: RegisterDto })
   @ApiResponse({
@@ -143,13 +164,38 @@ export class AuthController {
     schema: {
       example: {
         message: 'Cadastro realizado com sucesso',
-        data: { id: 1, name: 'João', email: 'joao@exemplo.com' },
+        data: {
+          id: 1,
+          name: 'João',
+          last_name: 'Silva',
+          email: 'joao@exemplo.com',
+          cpfCnpj: '52998224725',
+          cel: '11987654321',
+          status: 'actived',
+          profile: 'user',
+          confirmed_mail: 1,
+          active: 0,
+          plan_id: null,
+          created_at: '2024-10-29T10:00:00.000Z',
+          updated_at: '2024-10-29T10:00:00.000Z',
+        },
       },
     },
   })
   @ApiResponse({
-    status: 400,
-    description: 'Erro de validação (email duplicado, CPF inválido, etc.)',
+    status: 422,
+    description:
+      'Erro de validação (email duplicado, CPF inválido, senhas não conferem, etc.)',
+    schema: {
+      example: {
+        errors: {
+          email: ['Este email já foi cadastrado.'],
+          cpfCnpj: ['O CPF ou CNPJ informado não é válido.'],
+          password: ['A senha deve ter no mínimo 8 caracteres.'],
+          password_confirmation: ['As senhas não conferem.'],
+        },
+      },
+    },
   })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);

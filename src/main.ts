@@ -1,5 +1,5 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { NestFactory, Reflector } from '@nestjs/core';
+import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
 import { useContainer } from 'class-validator';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -9,6 +9,9 @@ async function bootstrap() {
 
   // Enable class-validator to use NestJS dependency injection
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
+
+  // Enable ClassSerializerInterceptor to apply @Exclude() decorators
+  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   // Enable CORS (compatible with Laravel configuration)
   app.enableCors({

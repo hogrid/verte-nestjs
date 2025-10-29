@@ -16,6 +16,7 @@ import {
   Configuration,
   PasswordReset,
   UserStatus,
+  UserProfile,
 } from '../database/entities';
 import {
   LoginDto,
@@ -131,6 +132,7 @@ export class AuthService {
    */
   async register(registerDto: RegisterDto) {
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const now = new Date();
 
     const user = this.userRepository.create({
       name: registerDto.name,
@@ -141,8 +143,10 @@ export class AuthService {
       status: UserStatus.ACTIVED,
       confirmed_mail: 1,
       password: hashedPassword,
-      profile: (registerDto.permission as any) || 'user',
+      profile: registerDto.permission || UserProfile.USER,
       active: 0,
+      created_at: now,
+      updated_at: now,
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -160,7 +164,7 @@ export class AuthService {
       instanceName = `WPP_${phoneDigits}_${savedUser.id}`;
     }
 
-    // Create default number for user
+    // Create default number for user (reuse same timestamp as user)
     const number = this.numberRepository.create({
       user_id: savedUser.id,
       name: 'Número Principal',
@@ -168,6 +172,8 @@ export class AuthService {
       status: 1,
       status_connection: 0,
       cel: savedUser.cel,
+      created_at: now,
+      updated_at: now,
     });
 
     await this.numberRepository.save(number);

@@ -28,6 +28,9 @@ import { AuthModule } from './auth/auth.module';
         charset: 'utf8mb4',
         timezone: '+00:00',
         logging: configService.get('NODE_ENV') === 'development',
+        // Fix bigint returning as string
+        supportBigNumbers: true,
+        bigNumberStrings: false, // Return bigint as number (safe for IDs < 2^53)
       }),
     }),
 
