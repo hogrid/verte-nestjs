@@ -2,11 +2,15 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
   Query,
   Param,
   ParseIntPipe,
   UseGuards,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +23,7 @@ import {
 } from '@nestjs/swagger';
 import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
+import { UpdatePlanDto } from './dto/update-plan.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AdminGuard } from '../auth/guards/admin.guard';
 
@@ -271,5 +276,186 @@ export class PlansController {
   })
   async create(@Body() createPlanDto: CreatePlanDto) {
     return this.plansService.create(createPlanDto);
+  }
+
+  /**
+   * PUT /api/v1/config/plans/:id
+   * Update an existing plan
+   * Protected endpoint (requires admin authentication)
+   */
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Atualizar plano existente',
+    description:
+      'Atualiza um plano de assinatura existente no sistema.\\n\\n' +
+      '**Requer autenticação**: Sim (JWT)\\n' +
+      '**Requer permissão**: Administrador\\n\\n' +
+      '**Funcionalidades:**\\n' +
+      '- Atualiza dados do plano (atualização parcial)\\n' +
+      '- Todos os campos são opcionais\\n' +
+      '- Apenas campos enviados serão atualizados\\n' +
+      '- Atualiza timestamp updated_at automaticamente\\n' +
+      '- Retorna 404 se plano não existir\\n\\n' +
+      '**Estrutura do response:**\\n' +
+      '- `data`: Objeto com o plano atualizado',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do plano a ser atualizado',
+    example: 1,
+    type: Number,
+  })
+  @ApiBody({
+    type: UpdatePlanDto,
+    description: 'Dados do plano a serem atualizados (atualização parcial)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Plano atualizado com sucesso',
+    schema: {
+      example: {
+        data: {
+          id: 1,
+          code_mp: null,
+          name: 'Plano Básico Atualizado',
+          value: 129.9,
+          value_promotion: 99.9,
+          unlimited: 0,
+          medias: 3,
+          reports: 5,
+          schedule: 1,
+          popular: 0,
+          code_product: null,
+          created_at: '2024-10-29T10:00:00.000Z',
+          updated_at: '2024-10-29T15:30:00.000Z',
+          deleted_at: null,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    schema: {
+      example: {
+        message: 'Unauthorized',
+        statusCode: 401,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Sem permissão (não é administrador)',
+    schema: {
+      example: {
+        message:
+          'Acesso negado. Apenas administradores podem acessar este recurso.',
+        error: 'Forbidden',
+        statusCode: 403,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Plano não encontrado',
+    schema: {
+      example: {
+        message: 'Plan with ID 999 not found',
+        error: 'Not Found',
+        statusCode: 404,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'Erro de validação',
+    schema: {
+      example: {
+        message: [
+          'O campo name deve ter no mínimo 3 caracteres.',
+          'O campo value deve ser maior ou igual a 0.',
+        ],
+        error: 'Unprocessable Entity',
+        statusCode: 422,
+      },
+    },
+  })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updatePlanDto: UpdatePlanDto,
+  ) {
+    return this.plansService.update(id, updatePlanDto);
+  }
+
+  /**
+   * DELETE /api/v1/config/plans/:id
+   * Delete (soft delete) an existing plan
+   * Protected endpoint (requires admin authentication)
+   */
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Deletar plano',
+    description:
+      'Deleta (soft delete) um plano de assinatura do sistema.\\n\\n' +
+      '**Requer autenticação**: Sim (JWT)\\n' +
+      '**Requer permissão**: Administrador\\n\\n' +
+      '**Funcionalidades:**\\n' +
+      '- Realiza soft delete (define deleted_at)\\n' +
+      '- Plano não é removido fisicamente do banco\\n' +
+      '- Plano deletado não aparece mais nas listagens\\n' +
+      '- Retorna 404 se plano não existir\\n' +
+      '- Retorna 204 No Content em caso de sucesso\\n\\n' +
+      '**Nota**: Esta operação é reversível (soft delete)',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do plano a ser deletado',
+    example: 1,
+    type: Number,
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Plano deletado com sucesso (sem conteúdo no response)',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    schema: {
+      example: {
+        message: 'Unauthorized',
+        statusCode: 401,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Sem permissão (não é administrador)',
+    schema: {
+      example: {
+        message:
+          'Acesso negado. Apenas administradores podem acessar este recurso.',
+        error: 'Forbidden',
+        statusCode: 403,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Plano não encontrado',
+    schema: {
+      example: {
+        message: 'Plan with ID 999 not found',
+        error: 'Not Found',
+        statusCode: 404,
+      },
+    },
+  })
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    return this.plansService.delete(id);
   }
 }

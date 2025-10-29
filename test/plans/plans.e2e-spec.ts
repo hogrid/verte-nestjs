@@ -12,6 +12,9 @@ import { ValidationExceptionFilter } from '../../src/common/filters/validation-e
  * Endpoints tested:
  * - GET /api/v1/config/plans (list all plans)
  * - GET /api/v1/config/plans/:id (get plan by ID)
+ * - POST /api/v1/config/plans (create plan - admin)
+ * - PUT /api/v1/config/plans/:id (update plan - admin)
+ * - DELETE /api/v1/config/plans/:id (delete plan - admin - soft delete)
  */
 describe('Plans Module (E2E)', () => {
   let app: INestApplication;
@@ -584,6 +587,469 @@ describe('Plans Module (E2E)', () => {
           expect.stringContaining('name deve ter no mínimo 3 caracteres'),
         ]),
       );
+    });
+  });
+
+  describe('PUT /api/v1/config/plans/:id', () => {
+    let adminToken: string;
+    let userToken: string;
+    let testPlanId: number;
+
+    beforeAll(async () => {
+      // Reuse tokens from POST tests (users already created)
+      const timestamp = Date.now();
+      const adminRegisterData = {
+        name: 'Admin Test Plans Update',
+        email: `admin-plans-update-${timestamp}@test.com`,
+        cel: '11999997777',
+        cpfCnpj: '12345678909',
+        password: 'Test@1234',
+        password_confirmation: 'Test@1234',
+        plan_id: 1,
+        permission: 'administrator',
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/v1/register')
+        .send(adminRegisterData);
+
+      const adminLoginResponse = await request(app.getHttpServer())
+        .post('/api/v1/login')
+        .send({
+          email: adminRegisterData.email,
+          password: adminRegisterData.password,
+        });
+
+      adminToken = adminLoginResponse.body.token;
+
+      // Create regular user
+      const timestamp2 = Date.now() + 1;
+      const userRegisterData = {
+        name: 'User Test Plans Update',
+        email: `user-plans-update-${timestamp2}@test.com`,
+        cel: '11988886666',
+        cpfCnpj: '11144477735',
+        password: 'Test@1234',
+        password_confirmation: 'Test@1234',
+        plan_id: 1,
+        permission: 'user',
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/v1/register')
+        .send(userRegisterData);
+
+      const userLoginResponse = await request(app.getHttpServer())
+        .post('/api/v1/login')
+        .send({
+          email: userRegisterData.email,
+          password: userRegisterData.password,
+        });
+
+      userToken = userLoginResponse.body.token;
+
+      // Create a test plan to update
+      const createResponse = await request(app.getHttpServer())
+        .post('/api/v1/config/plans')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Plano Para Atualizar',
+          value: 99.9,
+          value_promotion: 79.9,
+          unlimited: 0,
+          medias: 1,
+          reports: 1,
+          schedule: 0,
+        });
+
+      testPlanId = createResponse.body.data.id;
+    });
+
+    it('should update plan with admin authentication (partial update)', async () => {
+      // Create a fresh plan for this test
+      const freshPlanResponse = await request(app.getHttpServer())
+        .post('/api/v1/config/plans')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Plano Para Teste Parcial',
+          value: 99.9,
+          value_promotion: 79.9,
+          unlimited: 0,
+          medias: 1,
+          reports: 1,
+          schedule: 0,
+        });
+
+      const freshPlanId = freshPlanResponse.body.data.id;
+
+      const updateData = {
+        name: 'Plano Atualizado E2E',
+        value: 149.9,
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/api/v1/config/plans/${freshPlanId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect(200);
+
+      // Validate Laravel response structure
+      expect(response.body).toHaveProperty('data');
+      const plan = response.body.data;
+
+      // Validate updated fields
+      expect(plan.id).toBe(freshPlanId);
+      expect(plan.name).toBe(updateData.name);
+      expect(plan.value).toBe(updateData.value);
+
+      // Validate non-updated fields remain the same
+      expect(plan.value_promotion).toBe(79.9);
+      expect(plan.unlimited).toBe(0);
+      expect(plan.medias).toBe(1);
+
+      // Validate timestamps
+      expect(plan).toHaveProperty('updated_at');
+      expect(plan).toHaveProperty('created_at');
+    });
+
+    it('should update all fields when provided', async () => {
+      const updateData = {
+        name: 'Plano Completo Atualizado',
+        value: 299.9,
+        value_promotion: 249.9,
+        unlimited: 1,
+        medias: 10,
+        reports: 20,
+        schedule: 1,
+        popular: 1,
+        code_mp: 'MP-UPDATED',
+        code_product: 'PROD-UPDATED',
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/api/v1/config/plans/${testPlanId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect(200);
+
+      const plan = response.body.data;
+
+      // Validate all fields were updated
+      expect(plan.name).toBe(updateData.name);
+      expect(plan.value).toBe(updateData.value);
+      expect(plan.value_promotion).toBe(updateData.value_promotion);
+      expect(plan.unlimited).toBe(updateData.unlimited);
+      expect(plan.medias).toBe(updateData.medias);
+      expect(plan.reports).toBe(updateData.reports);
+      expect(plan.schedule).toBe(updateData.schedule);
+      expect(plan.popular).toBe(updateData.popular);
+      expect(plan.code_mp).toBe(updateData.code_mp);
+      expect(plan.code_product).toBe(updateData.code_product);
+    });
+
+    it('should return 404 for non-existent plan ID', async () => {
+      const updateData = {
+        name: 'Plano Inexistente',
+      };
+
+      const response = await request(app.getHttpServer())
+        .put('/api/v1/config/plans/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect(404);
+
+      expect(response.body).toHaveProperty('statusCode', 404);
+      expect(response.body.message).toContain('Plan with ID 999999 not found');
+    });
+
+    it('should return 400 for invalid ID format', async () => {
+      const updateData = {
+        name: 'Plano ID Inválido',
+      };
+
+      await request(app.getHttpServer())
+        .put('/api/v1/config/plans/invalid-id')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(updateData)
+        .expect(400);
+    });
+
+    it('should return 401 when not authenticated', async () => {
+      const updateData = {
+        name: 'Plano Sem Auth',
+      };
+
+      await request(app.getHttpServer())
+        .put(`/api/v1/config/plans/${testPlanId}`)
+        .send(updateData)
+        .expect(401);
+    });
+
+    it('should return 403 when user is not admin', async () => {
+      const updateData = {
+        name: 'Plano User Comum',
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/api/v1/config/plans/${testPlanId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .send(updateData)
+        .expect(403);
+
+      expect(response.body).toHaveProperty('statusCode', 403);
+      expect(response.body.message).toContain('administradores');
+    });
+
+    it('should return 422 for invalid field values', async () => {
+      const invalidData = {
+        name: 'AB', // Too short (min 3)
+        value: -50, // Negative value
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/api/v1/config/plans/${testPlanId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(invalidData)
+        .expect(422);
+
+      expect(response.body).toHaveProperty('statusCode', 422);
+      expect(response.body.message).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('name deve ter no mínimo 3 caracteres'),
+        ]),
+      );
+      expect(response.body.message).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('value deve ser maior ou igual a 0'),
+        ]),
+      );
+    });
+
+    it('should return 422 for invalid unlimited value', async () => {
+      const invalidData = {
+        unlimited: 5, // Must be 0 or 1
+      };
+
+      const response = await request(app.getHttpServer())
+        .put(`/api/v1/config/plans/${testPlanId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(invalidData)
+        .expect(422);
+
+      expect(response.body).toHaveProperty('statusCode', 422);
+      expect(response.body.message).toEqual(
+        expect.arrayContaining([expect.stringContaining('unlimited deve ser 0 ou 1')]),
+      );
+    });
+
+    it('should accept empty body (no updates)', async () => {
+      const emptyData = {};
+
+      const response = await request(app.getHttpServer())
+        .put(`/api/v1/config/plans/${testPlanId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(emptyData)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data.id).toBe(testPlanId);
+    });
+  });
+
+  describe('DELETE /api/v1/config/plans/:id', () => {
+    let adminToken: string;
+    let userToken: string;
+
+    beforeAll(async () => {
+      // Create admin and user for delete tests
+      const timestamp = Date.now();
+      const adminRegisterData = {
+        name: 'Admin Test Plans Delete',
+        email: `admin-plans-delete-${timestamp}@test.com`,
+        cel: '11999996666',
+        cpfCnpj: '12345678909',
+        password: 'Test@1234',
+        password_confirmation: 'Test@1234',
+        plan_id: 1,
+        permission: 'administrator',
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/v1/register')
+        .send(adminRegisterData);
+
+      const adminLoginResponse = await request(app.getHttpServer())
+        .post('/api/v1/login')
+        .send({
+          email: adminRegisterData.email,
+          password: adminRegisterData.password,
+        });
+
+      adminToken = adminLoginResponse.body.token;
+
+      // Create regular user
+      const timestamp2 = Date.now() + 1;
+      const userRegisterData = {
+        name: 'User Test Plans Delete',
+        email: `user-plans-delete-${timestamp2}@test.com`,
+        cel: '11988885555',
+        cpfCnpj: '11144477735',
+        password: 'Test@1234',
+        password_confirmation: 'Test@1234',
+        plan_id: 1,
+        permission: 'user',
+      };
+
+      await request(app.getHttpServer())
+        .post('/api/v1/register')
+        .send(userRegisterData);
+
+      const userLoginResponse = await request(app.getHttpServer())
+        .post('/api/v1/login')
+        .send({
+          email: userRegisterData.email,
+          password: userRegisterData.password,
+        });
+
+      userToken = userLoginResponse.body.token;
+    });
+
+    it('should delete plan with admin authentication (soft delete)', async () => {
+      // Create a plan to delete
+      const createResponse = await request(app.getHttpServer())
+        .post('/api/v1/config/plans')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Plano Para Deletar',
+          value: 99.9,
+          value_promotion: 79.9,
+          unlimited: 0,
+          medias: 1,
+          reports: 1,
+          schedule: 0,
+        });
+
+      const planId = createResponse.body.data.id;
+
+      // Delete the plan
+      await request(app.getHttpServer())
+        .delete(`/api/v1/config/plans/${planId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(204);
+
+      // Verify plan is soft deleted (should return 404 when trying to get it)
+      await request(app.getHttpServer())
+        .get(`/api/v1/config/plans/${planId}`)
+        .expect(404);
+    });
+
+    it('should return 404 for non-existent plan ID', async () => {
+      await request(app.getHttpServer())
+        .delete('/api/v1/config/plans/999999')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(404);
+    });
+
+    it('should return 400 for invalid ID format', async () => {
+      await request(app.getHttpServer())
+        .delete('/api/v1/config/plans/invalid-id')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(400);
+    });
+
+    it('should return 401 when not authenticated', async () => {
+      // Create a plan first
+      const createResponse = await request(app.getHttpServer())
+        .post('/api/v1/config/plans')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Plano Teste Auth',
+          value: 99.9,
+          value_promotion: 79.9,
+          unlimited: 0,
+          medias: 1,
+          reports: 1,
+          schedule: 0,
+        });
+
+      const planId = createResponse.body.data.id;
+
+      await request(app.getHttpServer())
+        .delete(`/api/v1/config/plans/${planId}`)
+        .expect(401);
+    });
+
+    it('should return 403 when user is not admin', async () => {
+      // Create a plan first
+      const createResponse = await request(app.getHttpServer())
+        .post('/api/v1/config/plans')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Plano Teste Permissão',
+          value: 99.9,
+          value_promotion: 79.9,
+          unlimited: 0,
+          medias: 1,
+          reports: 1,
+          schedule: 0,
+        });
+
+      const planId = createResponse.body.data.id;
+
+      const response = await request(app.getHttpServer())
+        .delete(`/api/v1/config/plans/${planId}`)
+        .set('Authorization', `Bearer ${userToken}`)
+        .expect(403);
+
+      expect(response.body).toHaveProperty('statusCode', 403);
+      expect(response.body.message).toContain('administradores');
+    });
+
+    it('should not return deleted plans in listing', async () => {
+      // Create a plan
+      const createResponse = await request(app.getHttpServer())
+        .post('/api/v1/config/plans')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          name: 'Plano Será Deletado Lista',
+          value: 99.9,
+          value_promotion: 79.9,
+          unlimited: 0,
+          medias: 1,
+          reports: 1,
+          schedule: 0,
+        });
+
+      const planId = createResponse.body.data.id;
+
+      // Get initial list count
+      const listBefore = await request(app.getHttpServer())
+        .get('/api/v1/config/plans')
+        .expect(200);
+
+      const countBefore = listBefore.body.data.length;
+
+      // Delete the plan
+      await request(app.getHttpServer())
+        .delete(`/api/v1/config/plans/${planId}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(204);
+
+      // Verify plan is not in list anymore
+      const listAfter = await request(app.getHttpServer())
+        .get('/api/v1/config/plans')
+        .expect(200);
+
+      const countAfter = listAfter.body.data.length;
+
+      // Count should be reduced by 1
+      expect(countAfter).toBe(countBefore - 1);
+
+      // Deleted plan should not be in the list
+      const deletedPlanInList = listAfter.body.data.find(
+        (p: any) => p.id === planId,
+      );
+      expect(deletedPlanInList).toBeUndefined();
     });
   });
 });

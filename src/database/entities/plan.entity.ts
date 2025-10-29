@@ -30,19 +30,19 @@ export class Plan {
   value_promotion: number;
 
   @Column({ type: 'tinyint', default: 0 })
-  unlimited: boolean;
+  unlimited: number;
 
   @Column({ type: 'tinyint', default: 0 })
-  medias: boolean;
+  medias: number;
 
   @Column({ type: 'tinyint', default: 0 })
-  reports: boolean;
+  reports: number;
 
   @Column({ type: 'tinyint', default: 0 })
-  schedule: boolean;
+  schedule: number;
 
   @Column({ type: 'tinyint', default: 0, nullable: true })
-  popular: boolean;
+  popular: number;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   code_product: string | null;

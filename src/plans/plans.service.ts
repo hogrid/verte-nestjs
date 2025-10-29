@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Plan } from '../database/entities/plan.entity';
 import { CreatePlanDto } from './dto/create-plan.dto';
+import { UpdatePlanDto } from './dto/update-plan.dto';
 
 /**
  * Plans Service
@@ -19,13 +20,17 @@ export class PlansService {
   /**
    * List all plans with optional search and ordering
    * Compatible with Laravel PlansController@index
+   * Only returns non-deleted plans (deleted_at IS NULL)
    */
   async findAll(search?: string, order: 'asc' | 'desc' = 'asc') {
     const query = this.planRepository.createQueryBuilder('plan');
 
+    // Filter out soft-deleted plans
+    query.where('plan.deleted_at IS NULL');
+
     // Search by name (LIKE)
     if (search) {
-      query.where('plan.name LIKE :search', { search: `%${search}%` });
+      query.andWhere('plan.name LIKE :search', { search: `%${search}%` });
     }
 
     // Order by id
@@ -50,13 +55,16 @@ export class PlansService {
   /**
    * Find a single plan by ID
    * Compatible with Laravel PlansController@show
+   * Only returns non-deleted plans (deleted_at IS NULL)
    *
-   * @throws NotFoundException if plan not found
+   * @throws NotFoundException if plan not found or deleted
    */
   async findOne(id: number) {
-    const plan = await this.planRepository.findOne({
-      where: { id },
-    });
+    const plan = await this.planRepository
+      .createQueryBuilder('plan')
+      .where('plan.id = :id', { id })
+      .andWhere('plan.deleted_at IS NULL')
+      .getOne();
 
     if (!plan) {
       throw new NotFoundException(`Plan with ID ${id} not found`);
@@ -89,5 +97,74 @@ export class PlansService {
     return {
       data: savedPlan,
     };
+  }
+
+  /**
+   * Update an existing plan
+   * Compatible with Laravel PlansController@update
+   * Requires admin authentication
+   *
+   * @throws NotFoundException if plan not found
+   */
+  async update(id: number, updatePlanDto: UpdatePlanDto) {
+    // Check if plan exists
+    const plan = await this.planRepository.findOne({
+      where: { id },
+    });
+
+    if (!plan) {
+      throw new NotFoundException(`Plan with ID ${id} not found`);
+    }
+
+    // Filter out undefined values to support partial updates
+    // Only update fields that were actually provided in the DTO
+    const updateData: Record<string, any> = {};
+    Object.keys(updatePlanDto).forEach((key) => {
+      const value = updatePlanDto[key as keyof UpdatePlanDto];
+      if (value !== undefined) {
+        updateData[key] = value;
+      }
+    });
+
+    // Update plan with new values
+    const now = new Date();
+    Object.assign(plan, {
+      ...updateData,
+      updated_at: now,
+    });
+
+    const updatedPlan = await this.planRepository.save(plan);
+
+    // Laravel response structure with data wrapper
+    return {
+      data: updatedPlan,
+    };
+  }
+
+  /**
+   * Delete (soft delete) an existing plan
+   * Compatible with Laravel PlansController@destroy
+   * Requires admin authentication
+   *
+   * @throws NotFoundException if plan not found
+   */
+  async delete(id: number) {
+    // Check if plan exists
+    const plan = await this.planRepository.findOne({
+      where: { id },
+    });
+
+    if (!plan) {
+      throw new NotFoundException(`Plan with ID ${id} not found`);
+    }
+
+    // Soft delete: set deleted_at timestamp
+    const now = new Date();
+    plan.deleted_at = now;
+
+    await this.planRepository.save(plan);
+
+    // Laravel returns 204 No Content for successful deletes
+    return;
   }
 }
