@@ -9,39 +9,39 @@ import { Response } from 'express';
 /**
  * Validation Exception Filter
  * Formats validation errors to match Laravel's response format
- * Laravel format: { "errors": { "field": ["message1", "message2"] } }
+ * Laravel returns status 422 (Unprocessable Entity) for DTO validation errors
+ * Other BadRequest errors (like ParseIntPipe) remain as 400
+ * Laravel format: { "message": ["error1", "error2"], "error": "Unprocessable Entity", "statusCode": 422 }
  */
 @Catch(BadRequestException)
 export class ValidationExceptionFilter implements ExceptionFilter {
   catch(exception: BadRequestException, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const status = exception.getStatus();
     const exceptionResponse: any = exception.getResponse();
 
-    // Transform NestJS validation errors to Laravel format
-    const errors: Record<string, string[]> = {};
+    // Check if this is a DTO validation error (array of messages)
+    // vs other BadRequest errors like ParseIntPipe (single message)
+    const isValidationError =
+      exceptionResponse.message && Array.isArray(exceptionResponse.message);
 
-    if (
-      exceptionResponse.message &&
-      Array.isArray(exceptionResponse.message)
-    ) {
-      exceptionResponse.message.forEach((message: string) => {
-        // Extract field name from message (e.g., "email must be an email" -> "email")
-        const parts = message.split(' ');
-        const field = parts[0];
+    // Laravel uses 422 for DTO validation errors, 400 for other bad requests
+    const status = isValidationError ? 422 : 400;
 
-        if (!errors[field]) {
-          errors[field] = [];
-        }
-        errors[field].push(message);
-      });
+    // Extract validation messages
+    let messages: string[] = [];
+
+    if (Array.isArray(exceptionResponse.message)) {
+      messages = exceptionResponse.message;
     } else if (typeof exceptionResponse.message === 'string') {
-      errors.general = [exceptionResponse.message];
+      messages = [exceptionResponse.message];
     }
 
+    // Return Laravel-compatible format
     response.status(status).json({
-      errors,
+      message: isValidationError ? messages : exceptionResponse.message,
+      error: isValidationError ? 'Unprocessable Entity' : 'Bad Request',
+      statusCode: status,
     });
   }
 }

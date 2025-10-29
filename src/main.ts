@@ -3,6 +3,7 @@ import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
 import { useContainer } from 'class-validator';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { ValidationExceptionFilter } from './common/filters/validation-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -20,6 +21,9 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type,Accept,Authorization',
   });
+
+  // Global Exception Filter (Laravel-compatible validation errors)
+  app.useGlobalFilters(new ValidationExceptionFilter());
 
   // Global Validation Pipe (for DTO validation)
   app.useGlobalPipes(
@@ -53,6 +57,7 @@ async function bootstrap() {
       'contato@verte.com',
     )
     .addTag('Auth', 'Autenticação e gerenciamento de sessão')
+    .addTag('Plans', 'Gerenciamento de planos de assinatura')
     .addTag('Users', 'Gerenciamento de usuários (Pendente)')
     .addTag('Campaigns', 'Campanhas de marketing (Pendente)')
     .addTag('Contacts', 'Gerenciamento de contatos (Pendente)')
