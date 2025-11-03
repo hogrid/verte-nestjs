@@ -152,9 +152,7 @@ export class PublicsService {
     // Filter by number if active number exists
     if (numberActive && numberActive.cel) {
       const cel = this.formatNumber(numberActive.cel);
-      const celWithoutStart55 = cel.startsWith('55')
-        ? cel.substring(2)
-        : cel;
+      const celWithoutStart55 = cel.startsWith('55') ? cel.substring(2) : cel;
 
       queryBuilder.andWhere(
         '(publics.number LIKE :cel OR publics.number LIKE :celWithout55 OR publics.number LIKE :originalCel OR publics.number IS NULL)',
@@ -211,10 +209,7 @@ export class PublicsService {
 
     // If setting this public as active, deactivate all others
     if (dto.status === 1) {
-      await this.publicRepository.update(
-        { user_id: userId },
-        { status: 0 },
-      );
+      await this.publicRepository.update({ user_id: userId }, { status: 0 });
     }
 
     // Update with DTO data
@@ -253,7 +248,7 @@ export class PublicsService {
 
     // Add contact rows
     for (const contact of contacts) {
-      const name = (contact.name || '').replace(/[^\w\s\-'\.]/gu, '');
+      const name = (contact.name || '').replace(/[^\w\s'\-.]/gu, '');
       csv += `${contact.number};"${name}";${contact.variable_1 || ''};${contact.variable_2 || ''};${contact.variable_3 || ''}\n`;
     }
 
@@ -277,7 +272,9 @@ export class PublicsService {
     }
 
     if (public_.user_id !== userId) {
-      throw new ForbiddenException('Você não tem permissão para duplicar este público.');
+      throw new ForbiddenException(
+        'Você não tem permissão para duplicar este público.',
+      );
     }
 
     // Get all contacts from original public

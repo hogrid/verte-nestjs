@@ -560,7 +560,9 @@ describe('Plans Module (E2E)', () => {
 
       expect(response.body).toHaveProperty('statusCode', 422);
       expect(response.body.message).toEqual(
-        expect.arrayContaining([expect.stringContaining('unlimited deve ser 0 ou 1')]),
+        expect.arrayContaining([
+          expect.stringContaining('unlimited deve ser 0 ou 1'),
+        ]),
       );
     });
 
@@ -838,7 +840,9 @@ describe('Plans Module (E2E)', () => {
 
       expect(response.body).toHaveProperty('statusCode', 422);
       expect(response.body.message).toEqual(
-        expect.arrayContaining([expect.stringContaining('unlimited deve ser 0 ou 1')]),
+        expect.arrayContaining([
+          expect.stringContaining('unlimited deve ser 0 ou 1'),
+        ]),
       );
     });
 

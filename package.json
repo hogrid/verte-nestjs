@@ -17,7 +17,11 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "typecheck": "tsc --noEmit",
+    "typecheck:watch": "tsc --noEmit --watch",
+    "validate": "npm run typecheck && npm run lint && npm run build",
+    "validate:full": "npm run typecheck && npm run lint && npm run build && npm run test:e2e"
   },
   "dependencies": {
     "@nestjs/bull": "^11.0.4",

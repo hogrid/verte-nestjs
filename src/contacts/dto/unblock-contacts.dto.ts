@@ -18,8 +18,13 @@ export class UnblockContactsDto {
   })
   @IsNotEmpty({ message: 'O campo contact_ids é obrigatório.' })
   @IsArray({ message: 'O campo contact_ids deve ser um array.' })
-  @ArrayMinSize(1, { message: 'O campo contact_ids deve conter pelo menos 1 ID.' })
-  @IsInt({ each: true, message: 'Todos os valores de contact_ids devem ser inteiros.' })
+  @ArrayMinSize(1, {
+    message: 'O campo contact_ids deve conter pelo menos 1 ID.',
+  })
+  @IsInt({
+    each: true,
+    message: 'Todos os valores de contact_ids devem ser inteiros.',
+  })
   @Type(() => Number)
   contact_ids: number[];
 }

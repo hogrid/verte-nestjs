@@ -24,7 +24,9 @@ export class UpdatePlanDto {
   @IsOptional()
   @IsString({ message: 'O campo name deve ser uma string.' })
   @MinLength(3, { message: 'O campo name deve ter no mínimo 3 caracteres.' })
-  @MaxLength(255, { message: 'O campo name deve ter no máximo 255 caracteres.' })
+  @MaxLength(255, {
+    message: 'O campo name deve ter no máximo 255 caracteres.',
+  })
   name?: string;
 
   @ApiPropertyOptional({
@@ -103,7 +105,9 @@ export class UpdatePlanDto {
   })
   @IsOptional()
   @IsString({ message: 'O campo code_mp deve ser uma string.' })
-  @MaxLength(255, { message: 'O campo code_mp deve ter no máximo 255 caracteres.' })
+  @MaxLength(255, {
+    message: 'O campo code_mp deve ter no máximo 255 caracteres.',
+  })
   code_mp?: string;
 
   @ApiPropertyOptional({
@@ -112,6 +116,8 @@ export class UpdatePlanDto {
   })
   @IsOptional()
   @IsString({ message: 'O campo code_product deve ser uma string.' })
-  @MaxLength(255, { message: 'O campo code_product deve ter no máximo 255 caracteres.' })
+  @MaxLength(255, {
+    message: 'O campo code_product deve ter no máximo 255 caracteres.',
+  })
   code_product?: string;
 }

@@ -5,7 +5,11 @@ import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { DataSource } from 'typeorm';
 import { BadRequestToValidationFilter } from '../../src/common/filters/bad-request-to-validation.filter';
-import { User } from '../../src/database/entities/user.entity';
+import {
+  User,
+  UserStatus,
+  UserProfile,
+} from '../../src/database/entities/user.entity';
 import { Plan } from '../../src/database/entities/plan.entity';
 import { Number } from '../../src/database/entities/number.entity';
 import { Public } from '../../src/database/entities/public.entity';
@@ -63,19 +67,20 @@ describe('Publics (E2E)', () => {
     });
 
     // Create test user
-    testUser = await dataSource.getRepository(User).save({
+    const userData = {
       name: 'Test User Publics',
       last_name: 'E2E',
       email: `publics-test-${Date.now()}@example.com`,
       cel: '11999999999',
       cpfCnpj: `${Date.now()}`.substring(0, 11),
       password: await bcrypt.hash('password123', 10),
-      status: 'actived',
-      profile: 'user',
+      status: UserStatus.ACTIVED,
+      profile: UserProfile.USER,
       confirmed_mail: 1,
       active: 1,
       plan_id: testPlan.id,
-    });
+    };
+    testUser = (await dataSource.getRepository(User).save(userData)) as User;
 
     // Create test WhatsApp number
     testNumber = await dataSource.getRepository(Number).save({
@@ -144,7 +149,9 @@ describe('Publics (E2E)', () => {
   afterAll(async () => {
     if (testUser) {
       // Cleanup in correct order (foreign keys)
-      await dataSource.getRepository(PublicByContact).delete({ user_id: testUser.id });
+      await dataSource
+        .getRepository(PublicByContact)
+        .delete({ user_id: testUser.id });
       await dataSource.getRepository(Contact).delete({ user_id: testUser.id });
       await dataSource.getRepository(Public).delete({ user_id: testUser.id });
       await dataSource.getRepository(Number).delete({ user_id: testUser.id });
@@ -210,9 +217,7 @@ describe('Publics (E2E)', () => {
     });
 
     it('should return 401 without authentication', () => {
-      return request(app.getHttpServer())
-        .get('/api/v1/publics')
-        .expect(401);
+      return request(app.getHttpServer()).get('/api/v1/publics').expect(401);
     });
   });
 
@@ -253,7 +258,8 @@ describe('Publics (E2E)', () => {
       const updated = await dataSource.getRepository(Public).findOne({
         where: { id: anotherPublic.id },
       });
-      expect(updated.status).toBe(0);
+      expect(updated).not.toBeNull();
+      expect(updated!.status).toBe(0);
 
       // Cleanup
       await dataSource.getRepository(Public).delete({ id: anotherPublic.id });
@@ -329,7 +335,9 @@ describe('Publics (E2E)', () => {
       expect(contacts.length).toBeGreaterThan(0);
 
       // Cleanup duplicated public and contacts
-      await dataSource.getRepository(Contact).delete({ public_id: newPublicId });
+      await dataSource
+        .getRepository(Contact)
+        .delete({ public_id: newPublicId });
       await dataSource.getRepository(Public).delete({ id: newPublicId });
     });
 
@@ -367,18 +375,21 @@ describe('Publics (E2E)', () => {
 
     it('should return 403 when trying to duplicate another user public', async () => {
       // Create another user
-      const anotherUser = await dataSource.getRepository(User).save({
+      const anotherUserData = {
         name: 'Another User',
         email: `another-publics-${Date.now()}@example.com`,
         cel: '11988888888',
         cpfCnpj: `${Date.now()}`.substring(0, 11),
         password: await bcrypt.hash('password123', 10),
-        status: 'actived',
-        profile: 'user',
+        status: UserStatus.ACTIVED,
+        profile: UserProfile.USER,
         confirmed_mail: 1,
         active: 1,
         plan_id: testPlan.id,
-      });
+      };
+      const anotherUser = (await dataSource
+        .getRepository(User)
+        .save(anotherUserData)) as User;
 
       // Create public for another user
       const anotherPublic = await dataSource.getRepository(Public).save({
@@ -425,7 +436,8 @@ describe('Publics (E2E)', () => {
         withDeleted: true,
       });
 
-      expect(deleted.deleted_at).not.toBeNull();
+      expect(deleted).not.toBeNull();
+      expect(deleted!.deleted_at).not.toBeNull();
 
       // Cleanup
       await dataSource.getRepository(Public).delete({ id: publicToDelete.id });

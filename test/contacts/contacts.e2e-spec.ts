@@ -4,7 +4,11 @@ import { useContainer } from 'class-validator';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { DataSource } from 'typeorm';
-import { User, UserStatus, UserProfile } from '../../src/database/entities/user.entity';
+import {
+  User,
+  UserStatus,
+  UserProfile,
+} from '../../src/database/entities/user.entity';
 import { Number } from '../../src/database/entities/number.entity';
 import { Contact } from '../../src/database/entities/contact.entity';
 import { BadRequestToValidationFilter } from '../../src/common/filters/bad-request-to-validation.filter';
@@ -362,7 +366,9 @@ describe('Contacts Module (E2E)', () => {
         .send({})
         .expect(422)
         .expect((res) => {
-          expect(res.body.message).toContain('O campo contact_ids é obrigatório.');
+          expect(res.body.message).toContain(
+            'O campo contact_ids é obrigatório.',
+          );
         });
     });
 
@@ -375,7 +381,9 @@ describe('Contacts Module (E2E)', () => {
         })
         .expect(422)
         .expect((res) => {
-          expect(res.body.message).toContain('O campo contact_ids deve ser um array.');
+          expect(res.body.message).toContain(
+            'O campo contact_ids deve ser um array.',
+          );
         });
     });
 
@@ -431,7 +439,9 @@ describe('Contacts Module (E2E)', () => {
         .send({})
         .expect(422)
         .expect((res) => {
-          expect(res.body.message).toContain('O campo contact_ids é obrigatório.');
+          expect(res.body.message).toContain(
+            'O campo contact_ids é obrigatório.',
+          );
         });
     });
 
@@ -444,7 +454,9 @@ describe('Contacts Module (E2E)', () => {
         })
         .expect(422)
         .expect((res) => {
-          expect(res.body.message).toContain('O campo contact_ids deve ser um array.');
+          expect(res.body.message).toContain(
+            'O campo contact_ids deve ser um array.',
+          );
         });
     });
 
@@ -616,7 +628,7 @@ describe('Contacts Module (E2E)', () => {
     // Create test contacts for export tests
     beforeAll(async () => {
       const contactRepository = dataSource.getRepository(Contact);
-      const normalizedCel = NumberHelper.formatNumber(testNumber.cel);
+      const normalizedCel = NumberHelper.formatNumber(testNumber.cel!);
 
       // Create 3 active test contacts for export (2 with label_id=1, 1 without)
       const testContacts = [
@@ -712,7 +724,9 @@ describe('Contacts Module (E2E)', () => {
       });
       if (existingTempUser) {
         await contactRepository.delete({ user_id: existingTempUser.id });
-        await dataSource.getRepository(Number).delete({ user_id: existingTempUser.id });
+        await dataSource
+          .getRepository(Number)
+          .delete({ user_id: existingTempUser.id });
         await userRepository.delete({ id: existingTempUser.id });
       }
 
@@ -764,7 +778,8 @@ describe('Contacts Module (E2E)', () => {
   describe('POST /api/v1/contacts/import/csv', () => {
     it('should import contacts from CSV successfully', () => {
       // Create a simple CSV buffer
-      const csvContent = 'Nome,Telefone\nJoão Silva,11999999999\nMaria Santos,11988888888';
+      const csvContent =
+        'Nome,Telefone\nJoão Silva,11999999999\nMaria Santos,11988888888';
       const csvBuffer = Buffer.from(csvContent);
 
       return request(app.getHttpServer())
@@ -785,7 +800,8 @@ describe('Contacts Module (E2E)', () => {
     });
 
     it('should import contacts with semicolon delimiter', () => {
-      const csvContent = 'Nome;Telefone\nPedro Silva;11977777777\nAna Costa;11966666666';
+      const csvContent =
+        'Nome;Telefone\nPedro Silva;11977777777\nAna Costa;11966666666';
       const csvBuffer = Buffer.from(csvContent);
 
       return request(app.getHttpServer())
@@ -885,7 +901,8 @@ describe('Contacts Module (E2E)', () => {
    */
   describe('POST /api/v1/contacts/import/test', () => {
     it('should return preview of valid contacts', () => {
-      const csvContent = 'Nome,Telefone\nJoão Preview,11999999999\nMaria Preview,11988888888';
+      const csvContent =
+        'Nome,Telefone\nJoão Preview,11999999999\nMaria Preview,11988888888';
       const csvBuffer = Buffer.from(csvContent);
 
       return request(app.getHttpServer())
@@ -901,7 +918,9 @@ describe('Contacts Module (E2E)', () => {
           expect(res.body.preview).toHaveProperty('invalid');
           expect(res.body.preview).toHaveProperty('sample');
           expect(res.body.preview).toHaveProperty('errors');
-          expect(res.body.message).toBe('Preview da importação gerado com sucesso');
+          expect(res.body.message).toBe(
+            'Preview da importação gerado com sucesso',
+          );
           expect(Array.isArray(res.body.preview.sample)).toBe(true);
         });
     });
@@ -1038,7 +1057,9 @@ João 7,11999999997`;
         .expect(422);
 
       const messages = response.body.message;
-      expect(messages.some((msg: string) => msg.includes('obrigatório'))).toBe(true);
+      expect(messages.some((msg: string) => msg.includes('obrigatório'))).toBe(
+        true,
+      );
     });
   });
 });

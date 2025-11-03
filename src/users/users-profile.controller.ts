@@ -161,7 +161,10 @@ export class UsersProfileController {
       },
     },
   })
-  async findOwnProfile(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+  async findOwnProfile(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
     // Verify user is accessing their own profile
     if (req.user.id !== id) {
       throw new ForbiddenException(

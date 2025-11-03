@@ -219,7 +219,7 @@ export class PublicsController {
       throw new NotFoundException('Público não encontrado.');
     }
 
-    const sanitizedName = public_.name.replace(/[^A-Za-z0-9\-]/g, '');
+    const sanitizedName = public_.name.replace(/[^A-Za-z0-9-]/g, '');
     const timestamp = new Date()
       .toISOString()
       .replace(/[T:]/g, ' ')
@@ -296,10 +296,7 @@ export class PublicsController {
   @ApiResponse({ status: 204, description: 'Público deletado com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Público não encontrado' })
-  async remove(
-    @Request() req: any,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
+  async remove(@Request() req: any, @Param('id', ParseIntPipe) id: number) {
     await this.publicsService.remove(req.user.id, id);
     // No content response
   }
@@ -345,7 +342,10 @@ export class PublicsController {
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Público não encontrado' })
-  async getRandomContact(@Request() req: any, @Query() dto: GetRandomContactDto) {
+  async getRandomContact(
+    @Request() req: any,
+    @Query() dto: GetRandomContactDto,
+  ) {
     const result = await this.publicsService.getRandomContact(req.user.id, dto);
     return { data: result };
   }

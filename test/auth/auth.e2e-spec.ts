@@ -453,7 +453,9 @@ describe('Auth Module (e2e) - Laravel Compatibility Tests', () => {
         .expect(400);
 
       expect(response.body.errors).toHaveProperty('pin');
-      expect(response.body.errors.pin[0]).toContain('código informado não está correto');
+      expect(response.body.errors.pin[0]).toContain(
+        'código informado não está correto',
+      );
     });
 
     it('Step 2: should reset password successfully', async () => {

@@ -729,7 +729,9 @@ describe('Users Module (E2E)', () => {
 
       expect(response.body.data.name).toBe('Nome Completo Atualizado');
       expect(response.body.data.last_name).toBe('Sobrenome Atualizado');
-      expect(response.body.data.email).toBe(`updated-email-${timestamp}@test.com`);
+      expect(response.body.data.email).toBe(
+        `updated-email-${timestamp}@test.com`,
+      );
       expect(response.body.data.profile).toBe('administrator');
     });
 

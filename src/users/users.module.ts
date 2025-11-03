@@ -16,7 +16,11 @@ import { Configuration } from '../database/entities/configuration.entity';
  */
 @Module({
   imports: [TypeOrmModule.forFeature([User, Plan, Number, Configuration])],
-  controllers: [UsersController, UsersProfileController, ConfigurationController],
+  controllers: [
+    UsersController,
+    UsersProfileController,
+    ConfigurationController,
+  ],
   providers: [UsersService],
   exports: [UsersService],
 })

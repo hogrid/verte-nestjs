@@ -10,7 +10,8 @@ import { Type } from 'class-transformer';
  */
 export class ImportCsvDto {
   @ApiProperty({
-    description: 'Arquivo CSV contendo contatos. Formato esperado: Nome, Telefone',
+    description:
+      'Arquivo CSV contendo contatos. Formato esperado: Nome, Telefone',
     type: 'string',
     format: 'binary',
     example: 'contacts.csv',

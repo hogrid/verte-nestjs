@@ -252,9 +252,7 @@ export class AuthService {
         throw new BadRequestException({
           errors: {
             pin: !pin ? ['O campo código é obrigatório.'] : undefined,
-            password: !password
-              ? ['O campo senha é obrigatório.']
-              : undefined,
+            password: !password ? ['O campo senha é obrigatório.'] : undefined,
           },
         });
       }
@@ -404,8 +402,7 @@ export class AuthService {
 
       return {
         numbersConnected: 0,
-        totalNumber:
-          this.configService.get<number>('NUMBER_VALUE') || 1,
+        totalNumber: this.configService.get<number>('NUMBER_VALUE') || 1,
         extraNumbers: 0,
         numberActive: null,
         serverType: null,

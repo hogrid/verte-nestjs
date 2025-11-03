@@ -378,10 +378,7 @@ export class ContactsController {
       },
     },
   })
-  async blockContacts(
-    @Body() blockDto: BlockContactsDto,
-    @Request() req: any,
-  ) {
+  async blockContacts(@Body() blockDto: BlockContactsDto, @Request() req: any) {
     return this.contactsService.blockContacts(req.user.id, blockDto);
   }
 
@@ -688,8 +685,7 @@ export class ContactsController {
       fileFilter: (req, file, cb) => {
         // Accept CSV MIME types or text/plain files with .csv extension
         const isValidMimeType =
-          file.mimetype === 'text/csv' ||
-          file.mimetype === 'application/csv';
+          file.mimetype === 'text/csv' || file.mimetype === 'application/csv';
 
         const isTextPlainWithCsvExtension =
           file.mimetype === 'text/plain' &&
@@ -828,8 +824,7 @@ export class ContactsController {
       fileFilter: (req, file, cb) => {
         // Accept CSV MIME types or text/plain files with .csv extension
         const isValidMimeType =
-          file.mimetype === 'text/csv' ||
-          file.mimetype === 'application/csv';
+          file.mimetype === 'text/csv' || file.mimetype === 'application/csv';
 
         const isTextPlainWithCsvExtension =
           file.mimetype === 'text/plain' &&

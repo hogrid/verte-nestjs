@@ -24,11 +24,14 @@ export class UpdatePublicDto {
   })
   @IsOptional()
   @IsString({ message: 'O campo name deve ser uma string.' })
-  @MaxLength(200, { message: 'O campo name deve ter no máximo 200 caracteres.' })
+  @MaxLength(200, {
+    message: 'O campo name deve ter no máximo 200 caracteres.',
+  })
   name?: string;
 
   @ApiPropertyOptional({
-    description: 'Status do público (0 = inativo, 1 = ativo). Se 1, todos os outros públicos ficam inativos',
+    description:
+      'Status do público (0 = inativo, 1 = ativo). Se 1, todos os outros públicos ficam inativos',
     example: 1,
   })
   @IsOptional()

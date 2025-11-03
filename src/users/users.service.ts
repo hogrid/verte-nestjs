@@ -1,7 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User, UserStatus, UserProfile } from '../database/entities/user.entity';
+import {
+  User,
+  UserStatus,
+  UserProfile,
+} from '../database/entities/user.entity';
 import { Number } from '../database/entities/number.entity';
 import { Configuration } from '../database/entities/configuration.entity';
 import { CreateCustomerDto } from './dto/create-customer.dto';
@@ -44,10 +48,9 @@ export class UsersService {
 
     // Search by name or email
     if (search) {
-      query.andWhere(
-        '(user.name LIKE :search OR user.email LIKE :search)',
-        { search: `%${search}%` },
-      );
+      query.andWhere('(user.name LIKE :search OR user.email LIKE :search)', {
+        search: `%${search}%`,
+      });
     }
 
     // Order by id
@@ -319,7 +322,7 @@ export class UsersService {
     }
 
     // Check if configuration already exists
-    let configuration = await this.configurationRepository.findOne({
+    const configuration = await this.configurationRepository.findOne({
       where: { user_id: userId },
     });
 
@@ -332,7 +335,8 @@ export class UsersService {
       }
       configuration.updated_at = now;
 
-      const updatedConfig = await this.configurationRepository.save(configuration);
+      const updatedConfig =
+        await this.configurationRepository.save(configuration);
 
       return {
         message: 'Configurações atualizadas com sucesso',
@@ -347,7 +351,8 @@ export class UsersService {
         updated_at: now,
       });
 
-      const savedConfig = await this.configurationRepository.save(newConfiguration);
+      const savedConfig =
+        await this.configurationRepository.save(newConfiguration);
 
       return {
         message: 'Configurações salvas com sucesso',

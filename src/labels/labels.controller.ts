@@ -108,10 +108,7 @@ export class LabelsController {
     status: 404,
     description: 'Nenhum número WhatsApp ativo encontrado',
   })
-  async findAll(
-    @Request() req: any,
-    @Query('id') numberId?: number,
-  ) {
+  async findAll(@Request() req: any, @Query('id') numberId?: number) {
     const labels = await this.labelsService.findAll(req.user.id, numberId);
 
     // Laravel compatibility: return data with pagination meta
@@ -184,10 +181,7 @@ export class LabelsController {
       },
     },
   })
-  async create(
-    @Request() req: any,
-    @Body() createLabelDto: CreateLabelDto,
-  ) {
+  async create(@Request() req: any, @Body() createLabelDto: CreateLabelDto) {
     const label = await this.labelsService.create(req.user.id, createLabelDto);
 
     // Laravel compatibility: return data wrapper

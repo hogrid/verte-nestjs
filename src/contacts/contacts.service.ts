@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets, In } from 'typeorm';
 import { Contact } from '../database/entities/contact.entity';
@@ -249,7 +253,8 @@ export class ContactsService {
     }
 
     // Generate unique ID for operation tracking (Laravel behavior)
-    const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const uniqueId =
+      Date.now().toString(36) + Math.random().toString(36).substr(2);
 
     return {
       data: {
@@ -293,7 +298,8 @@ export class ContactsService {
     }
 
     // Generate unique ID for operation tracking
-    const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const uniqueId =
+      Date.now().toString(36) + Math.random().toString(36).substr(2);
 
     return {
       data: {
@@ -338,7 +344,8 @@ export class ContactsService {
     }
 
     // Generate unique ID for operation tracking
-    const uniqueId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const uniqueId =
+      Date.now().toString(36) + Math.random().toString(36).substr(2);
 
     return {
       data: {
@@ -417,7 +424,9 @@ export class ContactsService {
         new Brackets((qb) => {
           qb.where('contacts.name LIKE :query', { query: `%${query}%` })
             .orWhere('contacts.number LIKE :query', { query: `%${query}%` })
-            .orWhere('contacts.labelsName LIKE :query', { query: `%${query}%` });
+            .orWhere('contacts.labelsName LIKE :query', {
+              query: `%${query}%`,
+            });
         }),
       );
     }
@@ -506,7 +515,12 @@ export class ContactsService {
     const exportData = contacts.map((contact) => ({
       Nome: contact.name || '',
       Telefone: contact.number || '',
-      Status: contact.status === 1 ? 'Ativo' : contact.status === 2 ? 'Bloqueado' : 'Inativo',
+      Status:
+        contact.status === 1
+          ? 'Ativo'
+          : contact.status === 2
+            ? 'Bloqueado'
+            : 'Inativo',
       Tags: contact.labelsName || '',
       'Data de Criação': contact.created_at
         ? new Date(contact.created_at).toLocaleDateString('pt-BR')
@@ -681,9 +695,9 @@ export class ContactsService {
         imported++;
       } catch (error) {
         invalid++;
-        errors.push(
-          `Linha ${lineNumber}: Erro ao importar - ${error.message}`,
-        );
+        const errorMessage =
+          error instanceof Error ? error.message : 'Erro desconhecido';
+        errors.push(`Linha ${lineNumber}: Erro ao importar - ${errorMessage}`);
       }
     }
 
@@ -754,9 +768,7 @@ export class ContactsService {
 
       // Validate phone number
       const phone = this.extractPhone(row);
-      const formattedPhone = phone
-        ? NumberHelper.formatNumber(phone)
-        : null;
+      const formattedPhone = phone ? NumberHelper.formatNumber(phone) : null;
 
       const isValid = formattedPhone && formattedPhone.length >= 12;
 
@@ -807,7 +819,8 @@ export class ContactsService {
         .pipe(
           csvParser({
             separator: delimiter,
-            mapHeaders: ({ header }: { header: string }) => header.trim().toLowerCase(),
+            mapHeaders: ({ header }: { header: string }) =>
+              header.trim().toLowerCase(),
           }),
         )
         .on('data', (row: any) => {
@@ -849,7 +862,9 @@ export class ContactsService {
 
     // If no named column, try first column
     const firstValue = Object.values(row)[0];
-    return firstValue ? String(firstValue).trim() : null;
+    if (!firstValue || typeof firstValue === 'object') return null;
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    return String(firstValue).trim();
   }
 
   /**
@@ -867,6 +882,9 @@ export class ContactsService {
 
     // If no phone key found, try second column
     const values = Object.values(row);
-    return values[1] ? String(values[1]).trim() : null;
+    const secondValue = values[1];
+    if (!secondValue || typeof secondValue === 'object') return null;
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    return String(secondValue).trim();
   }
 }

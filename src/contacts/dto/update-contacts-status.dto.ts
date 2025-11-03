@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsArray, IsInt, ArrayMinSize, IsIn } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsArray,
+  IsInt,
+  ArrayMinSize,
+  IsIn,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -19,7 +25,10 @@ export class UpdateContactsStatusDto {
   @IsNotEmpty({ message: 'O campo linhas é obrigatório.' })
   @IsArray({ message: 'O campo linhas deve ser um array.' })
   @ArrayMinSize(1, { message: 'O campo linhas deve conter pelo menos 1 ID.' })
-  @IsInt({ each: true, message: 'Todos os valores de linhas devem ser inteiros.' })
+  @IsInt({
+    each: true,
+    message: 'Todos os valores de linhas devem ser inteiros.',
+  })
   @Type(() => Number)
   rows: number[];
 

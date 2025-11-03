@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength, IsInt, IsPositive } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  IsInt,
+  IsPositive,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -16,7 +22,9 @@ export class CreateLabelDto {
   })
   @IsNotEmpty({ message: 'O campo nome é obrigatório.' })
   @IsString({ message: 'O campo nome deve ser uma string.' })
-  @MaxLength(150, { message: 'O campo nome deve ter no máximo 150 caracteres.' })
+  @MaxLength(150, {
+    message: 'O campo nome deve ter no máximo 150 caracteres.',
+  })
   name: string;
 
   @ApiProperty({

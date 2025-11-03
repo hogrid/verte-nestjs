@@ -1,9 +1,4 @@
-import {
-  IsEmail,
-  IsString,
-  MinLength,
-  IsOptional,
-} from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Match } from '../../common/decorators/match.decorator';
 import { IsUnique } from '../../common/validators/is-unique.validator';
@@ -54,7 +49,8 @@ export class UpdateUserProfileDto {
   cel?: string;
 
   @ApiPropertyOptional({
-    description: 'Nova senha (mínimo 8 caracteres). Se fornecida, password_confirmation é obrigatório',
+    description:
+      'Nova senha (mínimo 8 caracteres). Se fornecida, password_confirmation é obrigatório',
     example: 'novaSenha123',
     type: String,
     minLength: 8,

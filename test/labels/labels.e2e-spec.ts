@@ -4,7 +4,11 @@ import { useContainer } from 'class-validator';
 import request from 'supertest';
 import { AppModule } from '../../src/app.module';
 import { DataSource } from 'typeorm';
-import { User, UserStatus, UserProfile } from '../../src/database/entities/user.entity';
+import {
+  User,
+  UserStatus,
+  UserProfile,
+} from '../../src/database/entities/user.entity';
 import { Number } from '../../src/database/entities/number.entity';
 import { Label } from '../../src/database/entities/label.entity';
 import { BadRequestToValidationFilter } from '../../src/common/filters/bad-request-to-validation.filter';
@@ -143,9 +147,7 @@ describe('Labels Module (E2E)', () => {
     });
 
     it('should return 401 without authentication', () => {
-      return request(app.getHttpServer())
-        .get('/api/v1/labels')
-        .expect(401);
+      return request(app.getHttpServer()).get('/api/v1/labels').expect(401);
     });
   });
 
@@ -193,7 +195,9 @@ describe('Labels Module (E2E)', () => {
         })
         .expect(422)
         .expect((res) => {
-          expect(res.body.message).toContain('O campo number_id é obrigatório.');
+          expect(res.body.message).toContain(
+            'O campo number_id é obrigatório.',
+          );
         });
     });
 
@@ -207,7 +211,9 @@ describe('Labels Module (E2E)', () => {
         })
         .expect(400)
         .expect((res) => {
-          expect(res.body.message).toContain('O número informado não pertence ao usuário.');
+          expect(res.body.message).toContain(
+            'O número informado não pertence ao usuário.',
+          );
         });
     });
 
@@ -292,7 +298,9 @@ describe('Labels Module (E2E)', () => {
         .expect(422);
 
       const messages = response.body.message;
-      expect(messages.some((msg: string) => msg.includes('obrigatório'))).toBe(true);
+      expect(messages.some((msg: string) => msg.includes('obrigatório'))).toBe(
+        true,
+      );
     });
 
     it('should return 201 status when creating resource (Laravel style)', async () => {

@@ -27,7 +27,7 @@ export class NumberHelper {
     }
 
     // Remove spaces, hyphens, parentheses and +
-    let numberData = number.replace(/[ \-()+ ]/g, '');
+    let numberData = number.replace(/[ ()+-]/g, '');
 
     // If already has 12 or 13 digits, return
     if (numberData.length === 12 || numberData.length === 13) {

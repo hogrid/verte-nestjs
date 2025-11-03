@@ -16,10 +16,25 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
+
+    // Strict Type-Checking Options
+    "strict": true,
     "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
     "strictBindCallApply": true,
-    "noFallthroughCasesInSwitch": true
+    "strictPropertyInitialization": false, // TypeORM/NestJS decorators initialize properties
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+
+    // Additional Checks (com exceções pragmáticas para NestJS)
+    "noUnusedLocals": false, // Pode ter imports para types/decorators
+    "noUnusedParameters": false, // NestJS injeta parâmetros que podem não ser usados
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": false, // Muito restritivo para arrays comuns
+    "noImplicitOverride": false, // NestJS Guards não marcam override explicitamente
+    "noPropertyAccessFromIndexSignature": false // Objetos dinâmicos são comuns
   }
 }
