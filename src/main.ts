@@ -4,6 +4,7 @@ import { useContainer } from 'class-validator';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ValidationExceptionFilter } from './common/filters/validation-exception.filter';
+import { BadRequestToValidationFilter } from './common/filters/bad-request-to-validation.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -22,8 +23,12 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type,Accept,Authorization',
   });
 
-  // Global Exception Filter (Laravel-compatible validation errors)
-  app.useGlobalFilters(new ValidationExceptionFilter());
+  // Global Exception Filters (Laravel-compatible validation errors)
+  // BadRequestToValidationFilter converts 400 -> 422 for validation errors
+  app.useGlobalFilters(
+    new BadRequestToValidationFilter(),
+    new ValidationExceptionFilter(),
+  );
 
   // Global Validation Pipe (for DTO validation)
   app.useGlobalPipes(

@@ -1,6 +1,6 @@
 # Verte Backend - NestJS
 
-[![Migration Status](https://img.shields.io/badge/migration-5%25%20complete-yellow)](https://github.com/seu-org/verte-nestjs)
+[![Migration Status](https://img.shields.io/badge/migration-25.6%25%20complete-yellow)](https://github.com/seu-org/verte-nestjs)
 [![Compatibility](https://img.shields.io/badge/compatibility-100%25-success)](./docs/migration-specs/migration-master-spec.md)
 [![Laravel Original](https://img.shields.io/badge/source-Laravel%208-red)](../verte-back)
 [![Tested](https://img.shields.io/badge/tested-E2E%20100%25-brightgreen)](./test/auth/auth.e2e-spec.ts)
@@ -133,38 +133,30 @@ src/
 
 ## 🔄 Status da Migração
 
-### Progresso Geral: 5% (6/121 endpoints)
+### Progresso Geral: 25.6% (31/121 endpoints)
 
 ### Módulos Completos ✅
 
-#### 🔐 Auth Module (6/6 endpoints - 100%)
-- ✅ POST /api/v1/login
-- ✅ POST /api/v1/logout
-- ✅ POST /api/v1/register
-- ✅ POST /api/v1/reset (multi-step)
-- ✅ GET /api/v1/ping
-- ✅ POST /api/v1/check-mail-confirmation-code
+| Módulo | Endpoints | Testes E2E | Status |
+|--------|-----------|------------|--------|
+| **Auth** | 6/6 (100%) | 27/27 ✅ | ✅ Completo |
+| **Plans** | 5/5 (100%) | 15/15 ✅ | ✅ Completo |
+| **Users** | 8/8 (100%) | 24/24 ✅ | ✅ Completo |
+| **Contacts** | 9/9 (100%) | 57/57 ✅ | ✅ Completo |
+| **Labels** | 3/3 (100%) | 15/15 ✅ | ✅ Completo |
 
-**Features**:
-- ✅ JWT Authentication (Passport + JWT Strategy)
-- ✅ TypeORM Entities (User, Plan, Number, Configuration, PasswordReset)
-- ✅ Custom Validators (IsUnique, IsCpfOrCnpj)
-- ✅ Testes E2E completos (100% cobertura)
-- ✅ Laravel compatibility validated
+**Total**: 31 endpoints, 138 testes E2E passando
 
 ### Módulos Pendentes ⏸️
 
 | Módulo | Endpoints | Status |
 |--------|-----------|--------|
-| Users | 13 | Pendente (0/13) |
+| Públicos | 6 | ⏭️ PRÓXIMO |
 | Campaigns | 21 | Pendente (0/21) |
-| Contacts | 11 | Pendente (0/11) |
 | WhatsApp | 15 | Pendente (0/15) |
 | Payments | 5 | Pendente (0/5) |
 | Admin | 16 | Pendente (0/16) |
-| Plans | 8 | Pendente (0/8) |
-| Publics/Labels | 8 | Pendente (0/8) |
-| Utilities | 18 | Pendente (0/18) |
+| Utilities | ? | Pendente (0/?) |
 
 ---
 
@@ -188,14 +180,14 @@ npm run test:cov
 
 ### Status de Testes
 
-| Módulo | Cobertura | Status |
-|--------|-----------|--------|
-| Auth | 100% (6/6 endpoints) | ✅ Passing |
-| Users | 0% | ⏸️ Pendente |
-| Campaigns | 0% | ⏸️ Pendente |
-| Contacts | 0% | ⏸️ Pendente |
-| WhatsApp | 0% | ⏸️ Pendente |
-| Payments | 0% | ⏸️ Pendente |
+| Módulo | Cobertura | Testes | Status |
+|--------|-----------|--------|--------|
+| Auth | 100% (6/6 endpoints) | 27/27 | ✅ Passing |
+| Plans | 100% (5/5 endpoints) | 15/15 | ✅ Passing |
+| Users | 100% (8/8 endpoints) | 24/24 | ✅ Passing |
+| Contacts | 100% (9/9 endpoints) | 57/57 | ✅ Passing |
+| Labels | 100% (3/3 endpoints) | 15/15 | ✅ Passing |
+| **Total** | **31 endpoints** | **138 testes** | **✅ 100%** |
 
 ---
 

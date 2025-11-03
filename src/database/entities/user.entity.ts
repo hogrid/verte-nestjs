@@ -14,6 +14,7 @@ import { Exclude } from 'class-transformer';
 import { Plan } from './plan.entity';
 import { Number as NumberEntity } from './number.entity';
 import { Configuration } from './configuration.entity';
+import { Contact } from './contact.entity';
 
 export enum UserStatus {
   ACTIVED = 'actived',
@@ -127,4 +128,7 @@ export class User {
 
   @OneToOne(() => Configuration, (config) => config.user)
   config: Configuration;
+
+  @OneToMany(() => Contact, (contact) => contact.user)
+  contacts: Contact[];
 }

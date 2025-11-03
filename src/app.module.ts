@@ -5,6 +5,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { PlansModule } from './plans/plans.module';
+import { UsersModule } from './users/users.module';
+import { ContactsModule } from './contacts/contacts.module';
+import { LabelsModule } from './labels/labels.module';
 
 @Module({
   imports: [
@@ -37,12 +40,12 @@ import { PlansModule } from './plans/plans.module';
 
     AuthModule,
     PlansModule,
+    UsersModule,
+    ContactsModule,
+    LabelsModule,
 
     // TODO: Add modules here as migration progresses
-    // AuthModule,
-    // UsersModule,
     // CampaignsModule,
-    // ContactsModule,
     // WhatsappModule,
     // PaymentsModule,
   ],
