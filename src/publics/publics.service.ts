@@ -132,6 +132,16 @@ export class PublicsService {
           .andWhere('pbc.send = 1')
           .andWhere('pbc.deleted_at IS NULL');
       }, 'latest_not_blocked_and_sent_date')
+      // Campaign progress (latest campaign for this public)
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('cps.progress', 'progress')
+          .from('campaigns', 'cps')
+          .where('cps.public_id = publics.id')
+          .andWhere('cps.deleted_at IS NULL')
+          .orderBy('cps.created_at', 'DESC')
+          .limit(1);
+      }, 'progress')
       .where('publics.user_id = :userId', { userId })
       .groupBy('publics.id')
       .addGroupBy('publics.name')
