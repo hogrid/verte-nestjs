@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Number } from './number.entity';
+import { Public } from './public.entity';
 
 /**
  * Contact Entity
@@ -80,4 +81,8 @@ export class Contact {
   @ManyToOne(() => Number, { nullable: true })
   @JoinColumn({ name: 'number_id' })
   whatsappNumber: Number;
+
+  @ManyToOne(() => Public, (public_) => public_.contacts, { nullable: true })
+  @JoinColumn({ name: 'public_id' })
+  public: Public;
 }

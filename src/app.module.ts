@@ -8,6 +8,7 @@ import { PlansModule } from './plans/plans.module';
 import { UsersModule } from './users/users.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { LabelsModule } from './labels/labels.module';
+import { PublicsModule } from './publics/publics.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { LabelsModule } from './labels/labels.module';
     UsersModule,
     ContactsModule,
     LabelsModule,
+    PublicsModule,
 
     // TODO: Add modules here as migration progresses
     // CampaignsModule,
