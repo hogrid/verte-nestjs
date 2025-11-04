@@ -11,16 +11,20 @@ import { BadRequestToValidationFilter } from '../../src/common/filters/bad-reque
 import * as bcrypt from 'bcryptjs';
 
 /**
- * Campaigns E2E Tests (FASE 1: CRUD básico)
- * Tests all 4 endpoints:
+ * Campaigns E2E Tests (COMPLETO)
+ * Tests all 8 CRUD endpoints:
  * - GET /api/v1/campaigns
  * - POST /api/v1/campaigns
  * - GET /api/v1/campaigns/:id
  * - POST /api/v1/campaigns/:id/cancel
+ * - GET /api/v1/campaigns-check
+ * - POST /api/v1/campaigns-check
+ * - POST /api/v1/campaigns/change-status
+ * - GET /api/v1/campaigns/custom/public/:id
  *
  * Compatibilidade Laravel: 100%
  */
-describe('CampaignsController (e2e) - FASE 1', () => {
+describe('CampaignsController (e2e) - COMPLETO', () => {
   let app: INestApplication;
   let dataSource: DataSource;
   let authToken: string;
@@ -513,6 +517,305 @@ describe('CampaignsController (e2e) - FASE 1', () => {
     it('should return 401 without auth token', () => {
       return request(app.getHttpServer())
         .post(`/api/v1/campaigns/${campaignToCancel}/cancel`)
+        .expect(401);
+    });
+  });
+
+  /**
+   * GET /api/v1/campaigns-check
+   * Check active campaigns
+   */
+  describe('GET /api/v1/campaigns-check', () => {
+    let activeCampaignId: number;
+
+    beforeAll(async () => {
+      // Create active campaign for check test
+      await dataSource.query(`
+        INSERT INTO campaigns (user_id, number_id, public_id, name, type, status, total_contacts, date_end, created_at, updated_at)
+        VALUES (${testUserId}, ${testNumberId}, ${testPublicId}, 'Active Campaign', 1, 0, 5, DATE_ADD(NOW(), INTERVAL 30 DAY), NOW(), NOW())
+      `);
+
+      const [campaign] = await dataSource.query(
+        `SELECT id FROM campaigns WHERE name = 'Active Campaign' AND user_id = ${testUserId} LIMIT 1`,
+      );
+      activeCampaignId = campaign.id;
+    });
+
+    it('should list active campaigns successfully', () => {
+      return request(app.getHttpServer())
+        .get('/api/v1/campaigns-check')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('data');
+          expect(res.body).toHaveProperty('count');
+          expect(Array.isArray(res.body.data)).toBe(true);
+          expect(res.body.count).toBeGreaterThanOrEqual(1);
+        });
+    });
+
+    it('should return 401 without auth token', () => {
+      return request(app.getHttpServer())
+        .get('/api/v1/campaigns-check')
+        .expect(401);
+    });
+  });
+
+  /**
+   * POST /api/v1/campaigns-check
+   * Cancel multiple campaigns
+   */
+  describe('POST /api/v1/campaigns-check', () => {
+    let campaign1Id: number;
+    let campaign2Id: number;
+
+    beforeAll(async () => {
+      // Create 2 campaigns for bulk cancellation
+      await dataSource.query(`
+        INSERT INTO campaigns (user_id, number_id, public_id, name, type, status, total_contacts, date_end, created_at, updated_at)
+        VALUES
+          (${testUserId}, ${testNumberId}, ${testPublicId}, 'Bulk Cancel 1', 1, 0, 5, DATE_ADD(NOW(), INTERVAL 30 DAY), NOW(), NOW()),
+          (${testUserId}, ${testNumberId}, ${testPublicId}, 'Bulk Cancel 2', 1, 0, 5, DATE_ADD(NOW(), INTERVAL 30 DAY), NOW(), NOW())
+      `);
+
+      const campaigns = await dataSource.query(
+        `SELECT id FROM campaigns WHERE name LIKE 'Bulk Cancel%' AND user_id = ${testUserId} ORDER BY id`,
+      );
+      campaign1Id = campaigns[0].id;
+      campaign2Id = campaigns[1].id;
+    });
+
+    it('should cancel multiple campaigns successfully', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns-check')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          campaign_ids: [campaign1Id, campaign2Id],
+        })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('message');
+          expect(res.body).toHaveProperty('canceled');
+          expect(res.body.canceled).toBe(2);
+          expect(res.body.message).toContain('2 campanha(s) cancelada(s)');
+        });
+    });
+
+    it('should verify campaigns were canceled', async () => {
+      const campaigns = await dataSource.query(
+        `SELECT status, canceled FROM campaigns WHERE id IN (${campaign1Id}, ${campaign2Id})`,
+      );
+
+      campaigns.forEach((c: any) => {
+        expect(c.status).toBe(2);
+        expect(c.canceled).toBe(1);
+      });
+    });
+
+    it('should fail with empty campaign_ids array', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns-check')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          campaign_ids: [],
+        })
+        .expect(422)
+        .expect((res) => {
+          expect(res.body.errors).toHaveProperty('campaign_ids');
+        });
+    });
+
+    it('should fail without campaign_ids field', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns-check')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({})
+        .expect(422);
+    });
+
+    it('should return 401 without auth token', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns-check')
+        .send({
+          campaign_ids: [1, 2],
+        })
+        .expect(401);
+    });
+  });
+
+  /**
+   * POST /api/v1/campaigns/change-status
+   * Change campaign status
+   */
+  describe('POST /api/v1/campaigns/change-status', () => {
+    let campaignForStatusId: number;
+
+    beforeAll(async () => {
+      // Create campaign for status change test (status 0 = active)
+      await dataSource.query(`
+        INSERT INTO campaigns (user_id, number_id, public_id, name, type, status, total_contacts, date_end, created_at, updated_at)
+        VALUES (${testUserId}, ${testNumberId}, ${testPublicId}, 'Status Change Campaign', 1, 0, 5, DATE_ADD(NOW(), INTERVAL 30 DAY), NOW(), NOW())
+      `);
+
+      const [campaign] = await dataSource.query(
+        `SELECT id FROM campaigns WHERE name = 'Status Change Campaign' AND user_id = ${testUserId} LIMIT 1`,
+      );
+      campaignForStatusId = campaign.id;
+    });
+
+    it('should change status from active (0) to paused (1)', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns/change-status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          campaign_id: campaignForStatusId,
+          status: 1,
+        })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('message');
+          expect(res.body).toHaveProperty('campaign');
+          expect(res.body.campaign.status).toBe(1);
+          expect(res.body.campaign.status_formatted).toBe('Pausada');
+        });
+    });
+
+    it('should change status from paused (1) to active (0)', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns/change-status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          campaign_id: campaignForStatusId,
+          status: 0,
+        })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.campaign.status).toBe(0);
+          expect(res.body.campaign.status_formatted).toBe('Ativa');
+        });
+    });
+
+    it('should change status to canceled (2)', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns/change-status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          campaign_id: campaignForStatusId,
+          status: 2,
+        })
+        .expect(200)
+        .expect((res) => {
+          expect(res.body.campaign.status).toBe(2);
+          expect(res.body.campaign.status_formatted).toBe('Cancelada');
+        });
+    });
+
+    it('should fail to change status from canceled (2) to any other', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns/change-status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          campaign_id: campaignForStatusId,
+          status: 0,
+        })
+        .expect(400)
+        .expect((res) => {
+          expect(res.body.message).toContain(
+            'Não é possível alterar o status de uma campanha cancelada',
+          );
+        });
+    });
+
+    it('should fail with invalid status value', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns/change-status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          campaign_id: campaignForStatusId,
+          status: 99,
+        })
+        .expect(422)
+        .expect((res) => {
+          expect(res.body.errors).toHaveProperty('status');
+        });
+    });
+
+    it('should fail without campaign_id', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns/change-status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          status: 1,
+        })
+        .expect(422);
+    });
+
+    it('should return 404 for non-existent campaign', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns/change-status')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          campaign_id: 99999999,
+          status: 1,
+        })
+        .expect(404);
+    });
+
+    it('should return 401 without auth token', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/campaigns/change-status')
+        .send({
+          campaign_id: campaignForStatusId,
+          status: 1,
+        })
+        .expect(401);
+    });
+  });
+
+  /**
+   * GET /api/v1/campaigns/custom/public/:id
+   * Show custom public details
+   */
+  describe('GET /api/v1/campaigns/custom/public/:id', () => {
+    let customPublicId: number;
+
+    beforeAll(async () => {
+      // Create custom public for test
+      await dataSource.query(`
+        INSERT INTO custom_publics (user_id, number_id, file, status, created_at, updated_at)
+        VALUES (${testUserId}, ${testNumberId}, 'uploads/test.xlsx', 0, NOW(), NOW())
+      `);
+
+      const [customPublic] = await dataSource.query(
+        `SELECT id FROM custom_publics WHERE user_id = ${testUserId} LIMIT 1`,
+      );
+      customPublicId = customPublic.id;
+    });
+
+    it('should get custom public details successfully', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/campaigns/custom/public/${customPublicId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200)
+        .expect((res) => {
+          expect(res.body).toHaveProperty('data');
+          expect(res.body.data.id).toBe(customPublicId);
+          expect(res.body.data).toHaveProperty('status');
+          expect(res.body.data).toHaveProperty('file');
+          expect(res.body.data).toHaveProperty('number_id');
+        });
+    });
+
+    it('should return 404 for non-existent custom public', () => {
+      return request(app.getHttpServer())
+        .get('/api/v1/campaigns/custom/public/99999999')
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404);
+    });
+
+    it('should return 401 without auth token', () => {
+      return request(app.getHttpServer())
+        .get(`/api/v1/campaigns/custom/public/${customPublicId}`)
         .expect(401);
     });
   });

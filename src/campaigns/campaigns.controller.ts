@@ -38,6 +38,8 @@ import { UpdateSimplifiedPublicDto } from './dto/update-simplified-public.dto';
 import { CreateCustomPublicDto } from './dto/create-custom-public.dto';
 import { UpdateCustomPublicDto } from './dto/update-custom-public.dto';
 import { CreateLabelPublicDto } from './dto/create-label-public.dto';
+import { CancelMultipleCampaignsDto } from './dto/cancel-multiple-campaigns.dto';
+import { ChangeStatusDto } from './dto/change-status.dto';
 
 /**
  * CampaignsController
@@ -891,5 +893,213 @@ Cria um público filtrado por etiquetas específicas.
       dto,
     );
     return { data: result };
+  }
+
+  /**
+   * GET /api/v1/campaigns-check
+   * Check active campaigns status
+   * Laravel: CampaignsController@check
+   */
+  @Get('campaigns-check')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verificar campanhas ativas',
+    description: `
+Retorna lista de campanhas ativas/em execução do usuário.
+
+**Filtra por status**:
+- Status 0: Campanhas pendentes ou em execução
+- Status 3: Campanhas agendadas
+
+**Response**:
+- data: Array de campanhas ativas com relationships (public, number)
+- count: Total de campanhas ativas
+
+**Compatibilidade**: 100% Laravel CampaignsController@check
+    `,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Campanhas ativas listadas',
+    schema: {
+      example: {
+        data: [
+          {
+            id: 1,
+            name: 'Black Friday 2024',
+            status: 0,
+            total_contacts: 150,
+            total_sent: 45,
+            progress: 30,
+          },
+        ],
+        count: 1,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async checkActiveCampaigns(@Request() req: any) {
+    return this.campaignsService.check(req.user.id);
+  }
+
+  /**
+   * POST /api/v1/campaigns-check
+   * Cancel multiple campaigns
+   * Laravel: CampaignsController@cancel (bulk operation)
+   */
+  @Post('campaigns-check')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancelar múltiplas campanhas',
+    description: `
+Cancela múltiplas campanhas de uma vez.
+
+**Campos Aceitos**:
+- campaign_ids (obrigatório): Array de IDs das campanhas a cancelar
+
+**Ação**:
+- Define status = 2 (cancelada) para todas as campanhas
+- Define canceled = 1 para todas as campanhas
+
+**Compatibilidade**: 100% Laravel CampaignsController@cancel (bulk)
+    `,
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        campaign_ids: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Array de IDs das campanhas',
+          example: [1, 2, 3],
+        },
+      },
+      required: ['campaign_ids'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Campanhas canceladas com sucesso',
+    schema: {
+      example: {
+        message: '3 campanha(s) cancelada(s) com sucesso.',
+        canceled: 3,
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Nenhuma campanha encontrada' })
+  @ApiResponse({
+    status: 422,
+    description: 'Erro de validação',
+  })
+  async cancelMultipleCampaigns(
+    @Request() req: any,
+    @Body() dto: CancelMultipleCampaignsDto,
+  ) {
+    return this.campaignsService.cancelMultiple(req.user.id, dto.campaign_ids);
+  }
+
+  /**
+   * POST /api/v1/campaigns/change-status
+   * Change campaign status
+   * Laravel: CampaignsController@change_status
+   */
+  @Post('campaigns/change-status')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Alterar status de campanha',
+    description: `
+Altera o status de uma campanha específica.
+
+**Campos Aceitos**:
+- campaign_id (obrigatório): ID da campanha
+- status (obrigatório): Novo status (0=ativa, 1=pausada, 2=cancelada)
+
+**Regras de Transição de Status**:
+- Pausada (1) → Ativa (0): ✅ Permitido
+- Ativa (0) → Pausada (1): ✅ Permitido
+- Qualquer → Cancelada (2): ✅ Permitido (irreversível)
+- Cancelada (2) → Qualquer: ❌ NÃO permitido
+
+**Compatibilidade**: 100% Laravel CampaignsController@change_status
+    `,
+  })
+  @ApiBody({
+    type: ChangeStatusDto,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status atualizado com sucesso',
+    schema: {
+      example: {
+        message: 'Status da campanha atualizado com sucesso.',
+        campaign: {
+          id: 1,
+          status: 1,
+          status_formatted: 'Pausada',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Transição de status inválida' })
+  @ApiResponse({ status: 404, description: 'Campanha não encontrada' })
+  @ApiResponse({
+    status: 422,
+    description: 'Erro de validação',
+  })
+  async changeStatus(@Request() req: any, @Body() dto: ChangeStatusDto) {
+    return this.campaignsService.changeStatus(
+      req.user.id,
+      dto.campaign_id,
+      dto.status,
+    );
+  }
+
+  /**
+   * GET /api/v1/campaigns/custom/public/:id
+   * Show custom public details
+   * Laravel: CampaignsController@show_simplified_public (reused)
+   */
+  @Get('campaigns/custom/public/:id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Mostrar público customizado',
+    description: `
+Retorna informações de um público customizado específico.
+
+**Response**:
+- data: Objeto com informações do público customizado
+  - id: ID do público
+  - status: Status do processamento
+  - file: Caminho do arquivo XLSX
+  - number_id: ID do número WhatsApp usado
+
+**Compatibilidade**: 100% Laravel CampaignsController@show_simplified_public (reused)
+    `,
+  })
+  @ApiParam({ name: 'id', description: 'ID do público customizado', type: Number })
+  @ApiResponse({
+    status: 200,
+    description: 'Público encontrado',
+    schema: {
+      example: {
+        data: {
+          id: 1,
+          status: 0,
+          file: 'uploads/custom_publics/custom-public-1699999999999-123456789.xlsx',
+          number_id: 1,
+          created_at: '2024-11-04T00:00:00.000Z',
+          updated_at: '2024-11-04T00:00:00.000Z',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Público não encontrado' })
+  async showCustomPublicDetail(
+    @Request() req: any,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.campaignsService.showCustomPublic(req.user.id, id);
   }
 }

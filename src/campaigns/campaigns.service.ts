@@ -772,6 +772,203 @@ export class CampaignsService {
   }
 
   /**
+   * Check campaigns status (GET /api/v1/campaigns-check)
+   * Laravel: CampaignsController@check
+   * Returns list of active/in-progress campaigns
+   */
+  async check(userId: number) {
+    this.logger.log('🔍 Verificando campanhas ativas', { userId });
+
+    try {
+      // Find all active campaigns (status 0 = pending/running, 3 = scheduled)
+      const campaigns = await this.campaignRepository.find({
+        where: [
+          { user_id: userId, status: 0 },
+          { user_id: userId, status: 3 },
+        ],
+        relations: ['public', 'number'],
+        order: { id: 'DESC' },
+      });
+
+      this.logger.log('✅ Campanhas ativas encontradas', {
+        count: campaigns.length,
+      });
+
+      return {
+        data: campaigns,
+        count: campaigns.length,
+      };
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao verificar campanhas', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Cancel multiple campaigns (POST /api/v1/campaigns-check)
+   * Laravel: CampaignsController@cancel (bulk operation)
+   * Cancels multiple campaigns at once
+   */
+  async cancelMultiple(userId: number, campaignIds: number[]) {
+    this.logger.log('🚫 Cancelando múltiplas campanhas', {
+      userId,
+      count: campaignIds.length,
+    });
+
+    try {
+      // Find all campaigns belonging to user
+      const campaigns = await this.campaignRepository.find({
+        where: campaignIds.map((id) => ({ id, user_id: userId })),
+      });
+
+      if (campaigns.length === 0) {
+        throw new NotFoundException('Nenhuma campanha encontrada.');
+      }
+
+      // Update all campaigns to canceled status
+      await this.campaignRepository
+        .createQueryBuilder()
+        .update(Campaign)
+        .set({ status: 2, canceled: 1 })
+        .where('id IN (:...ids)', { ids: campaignIds })
+        .andWhere('user_id = :userId', { userId })
+        .execute();
+
+      this.logger.log('✅ Campanhas canceladas', { count: campaigns.length });
+
+      return {
+        message: `${campaigns.length} campanha(s) cancelada(s) com sucesso.`,
+        canceled: campaigns.length,
+      };
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao cancelar campanhas', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Change campaign status (POST /api/v1/campaigns/change-status)
+   * Laravel: CampaignsController@change_status
+   * Changes campaign status with validation of state transitions
+   */
+  async changeStatus(
+    userId: number,
+    campaignId: number,
+    newStatus: number,
+  ) {
+    this.logger.log('🔄 Alterando status de campanha', {
+      userId,
+      campaignId,
+      newStatus,
+    });
+
+    try {
+      // Find campaign
+      const campaign = await this.campaignRepository.findOne({
+        where: { id: campaignId, user_id: userId },
+      });
+
+      if (!campaign) {
+        throw new NotFoundException('Campanha não encontrada.');
+      }
+
+      // Validate state transition
+      const currentStatus = campaign.status;
+
+      // Cannot change status if already canceled/finished (status = 2)
+      if (currentStatus === 2) {
+        throw new BadRequestException(
+          'Não é possível alterar o status de uma campanha cancelada.',
+        );
+      }
+
+      // Update status
+      campaign.status = newStatus;
+      await this.campaignRepository.save(campaign);
+
+      this.logger.log('✅ Status alterado', {
+        campaignId,
+        from: currentStatus,
+        to: newStatus,
+      });
+
+      const statusFormatted = this.formatCampaignStatus(newStatus);
+
+      return {
+        message: 'Status da campanha atualizado com sucesso.',
+        campaign: {
+          id: campaign.id,
+          status: newStatus,
+          status_formatted: statusFormatted,
+        },
+      };
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao alterar status', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Show custom public details (GET /api/v1/campaigns/custom/public/:id)
+   * Laravel: CampaignsController@show_simplified_public (reused)
+   * Returns custom public information with statistics
+   */
+  async showCustomPublic(userId: number, id: number) {
+    this.logger.log('📊 Buscando detalhes do público customizado', {
+      userId,
+      id,
+    });
+
+    try {
+      const customPublic = await this.customPublicRepository.findOne({
+        where: { id, user_id: userId },
+      });
+
+      if (!customPublic) {
+        throw new NotFoundException('Público customizado não encontrado.');
+      }
+
+      // Count contacts processed (if contacts were created from file)
+      // For now, return basic info
+      return {
+        data: {
+          id: customPublic.id,
+          status: customPublic.status,
+          file: customPublic.file,
+          number_id: customPublic.number_id,
+          created_at: customPublic.created_at,
+          updated_at: customPublic.updated_at,
+        },
+      };
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao buscar público customizado', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Helper: Format campaign status to human-readable string
+   */
+  private formatCampaignStatus(status: number): string {
+    const statusMap: Record<number, string> = {
+      0: 'Ativa',
+      1: 'Pausada',
+      2: 'Cancelada',
+      3: 'Agendada',
+    };
+
+    return statusMap[status] || 'Desconhecida';
+  }
+
+  /**
    * Helper: Convert media type string to number (matching Laravel)
    * Laravel: CampaignsController@getMediaType2 (lines 403-406)
    */
