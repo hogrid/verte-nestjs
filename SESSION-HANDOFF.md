@@ -1,14 +1,14 @@
 # 🔄 SESSION HANDOFF - Migração Laravel → NestJS
 
-**Data**: 30 de Outubro de 2024
-**Progresso**: 31/121 endpoints (25.6%)
-**Última sessão**: Implementação de Contacts (import/export) + Labels completo
+**Data**: 04 de Novembro de 2025
+**Progresso**: 41/121 endpoints implementados (33.9%)
+**Última sessão**: Campaigns FASE 2 (Públicos Simplificados/Custom) - 60% concluída
 
 ---
 
 ## 📊 PROGRESSO ATUAL
 
-### ✅ Módulos Completados (5/X)
+### ✅ Módulos Completados (6/X)
 
 | Módulo | Endpoints | Testes E2E | Status | Compatibilidade Laravel |
 |--------|-----------|------------|--------|------------------------|
@@ -17,372 +17,483 @@
 | **Users** | 8/8 (100%) | 24/24 ✅ | ✅ Completo | 100% |
 | **Contacts** | 9/9 (100%) | 57/57 ✅ | ✅ Completo | 100% |
 | **Labels** | 3/3 (100%) | 15/15 ✅ | ✅ Completo | 100% |
+| **Campaigns FASE 1** | 4/4 (100%) | 12/12 ✅ | ✅ Completo | 100% |
 
-**Total**: 31/121 endpoints implementados (25.6%)
-**Testes**: 138 testes E2E passando (100%)
+**Total Live**: 35/121 endpoints (28.9%)
+**Total Implementado**: 41/121 endpoints (33.9% - incluindo FASE 2 service)
+**Testes**: 150 testes E2E passando (100%)
 
 ---
 
-## 🎯 PRÓXIMO MÓDULO: PÚBLICOS
+## 🎯 TRABALHO EM ANDAMENTO: CAMPAIGNS FASE 2
 
-### Informações do Módulo Públicos
+### Status: 60% Concluído (3/5 etapas)
 
-**Complexidade**: 🔴 Alta
-**Endpoints**: 6 rotas
-**Estimativa**: 3-4 horas
+**Objetivo**: Implementar endpoints de Públicos Simplificados e Customizados (8 endpoints)
 
-#### Rotas Documentadas
-```
-GET    /api/v1/publics                           - Listar públicos
-POST   /api/v1/publics/{public}                  - Atualizar público
-GET    /api/v1/publics/download-contacts/{public} - Download contatos
-POST   /api/v1/publics-duplicate                 - Duplicar público
-DELETE /api/v1/publics/{creative}                - Deletar público
-GET    /api/v1/publics/contact                   - Buscar contato
-```
+### ✅ Concluído
 
-#### Código Laravel
-- **Controller**: `../verte-back/app/Http/Controllers/PublicsController.php` (326 linhas)
-- **Models**:
-  - `Publics.php` - Público principal
-  - `PublicByContact.php` - Relacionamento público-contato
-  - `SimplifiedPublic.php` - Público simplificado
-  - `CustomPublic.php` - Público customizado
-
-#### Entities Necessárias
+#### 1. Entities Criadas (FASE 1)
 ```typescript
-// Precisam ser criadas:
-src/database/entities/public.entity.ts
-src/database/entities/public-by-contact.entity.ts
-src/database/entities/simplified-public.entity.ts
-src/database/entities/custom-public.entity.ts
+src/database/entities/simplified-public.entity.ts  ✅
+src/database/entities/custom-public.entity.ts      ✅
 ```
 
-#### Complexidades Identificadas
-1. **Queries complexas** com múltiplas subqueries (COUNT, MAX, etc.)
-2. **Agregações** - contagem de contatos, bloqueados, enviados
-3. **Relacionamentos** complexos com:
-   - Contacts
-   - Campaigns
-   - Numbers
-   - PublicByContact
-4. **Sistema de cache** (usar ou ignorar por enquanto)
-5. **Formatação de números** WhatsApp (já existe NumberHelper)
-
----
-
-## 📁 ESTRUTURA DO PROJETO
-
-### Diretórios Principais
-```
-src/
-├── auth/                    ✅ Completo (6 endpoints)
-├── plans/                   ✅ Completo (5 endpoints)
-├── users/                   ✅ Completo (8 endpoints)
-├── contacts/                ✅ Completo (9 endpoints)
-│   ├── dto/
-│   │   ├── create-contact.dto.ts
-│   │   ├── update-contact-status.dto.ts
-│   │   ├── block-contacts.dto.ts
-│   │   ├── search-contacts.dto.ts
-│   │   ├── import-csv.dto.ts
-│   │   └── test-import.dto.ts
-│   ├── contacts.controller.ts
-│   ├── contacts.service.ts
-│   └── contacts.module.ts
-├── labels/                  ✅ Completo (3 endpoints)
-│   ├── dto/
-│   │   └── create-label.dto.ts
-│   ├── labels.controller.ts
-│   ├── labels.service.ts
-│   └── labels.module.ts
-├── database/
-│   └── entities/
-│       ├── user.entity.ts          ✅
-│       ├── plan.entity.ts          ✅
-│       ├── number.entity.ts        ✅
-│       ├── contact.entity.ts       ✅
-│       ├── label.entity.ts         ✅
-│       ├── configuration.entity.ts ✅
-│       └── password-reset.entity.ts ✅
-├── common/
-│   ├── filters/
-│   │   └── bad-request-to-validation.filter.ts
-│   ├── guards/
-│   │   └── jwt-auth.guard.ts
-│   ├── validators/
-│   │   ├── is-unique.validator.ts
-│   │   └── is-cpf-cnpj.validator.ts
-│   └── helpers/
-│       └── number.helper.ts
-└── app.module.ts
-
-test/
-├── auth/
-│   └── auth.e2e-spec.ts        ✅ 27 testes
-├── plans/
-│   └── plans.e2e-spec.ts       ✅ 15 testes
-├── users/
-│   └── users.e2e-spec.ts       ✅ 24 testes
-├── contacts/
-│   └── contacts.e2e-spec.ts    ✅ 57 testes
-└── labels/
-    └── labels.e2e-spec.ts      ✅ 15 testes
+#### 2. DTOs Criados (6 arquivos)
+```typescript
+src/campaigns/dto/list-simplified-public.dto.ts      ✅
+src/campaigns/dto/create-simplified-public.dto.ts    ✅
+src/campaigns/dto/update-simplified-public.dto.ts    ✅
+src/campaigns/dto/create-custom-public.dto.ts        ✅
+src/campaigns/dto/update-custom-public.dto.ts        ✅
+src/campaigns/dto/create-label-public.dto.ts         ✅
 ```
 
----
+#### 3. Service Methods (8 métodos implementados)
 
-## 🔧 PADRÕES E CONVENÇÕES ESTABELECIDOS
-
-### 1. Estrutura de Controller
+**Arquivo**: `src/campaigns/campaigns.service.ts` (linhas 392-771)
 
 ```typescript
-import { Controller, Get, Post, ... } from '@nestjs/common';
-import { ApiTags, ApiOperation, ... } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+// ✅ Método 1: Listar contatos de público simplificado
+async listSimplifiedPublic(userId: number, dto: ListSimplifiedPublicDto)
 
-@ApiTags('NomeDoModulo')
-@Controller('api/v1/rota')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth('JWT-auth')
-export class ExemploController {
-  constructor(private readonly service: ExemploService) {}
+// ✅ Método 2: Mostrar detalhes de público simplificado
+async showSimplifiedPublic(userId: number, id: number)
 
-  @Get()
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Título curto',
-    description: 'Descrição detalhada em português\n\n' +
-      '**Requer autenticação**: Sim (JWT)\n\n' +
-      '**Regras de negócio:**\n' +
-      '- Regra 1\n' +
-      '- Regra 2',
-  })
-  @ApiResponse({ status: 200, description: 'Sucesso' })
-  async metodo(@Request() req: any) {
-    const resultado = await this.service.metodo(req.user.id);
+// ✅ Método 3: Criar público simplificado
+async createSimplifiedPublic(userId: number, dto: CreateSimplifiedPublicDto)
 
-    // Laravel compatibility: wrapper "data"
-    return { data: resultado };
+// ✅ Método 4: Cancelar públicos simplificados
+async updateSimplifiedPublic(userId: number, id: number, dto: UpdateSimplifiedPublicDto)
+
+// ✅ Método 5: Criar público customizado (XLSX)
+async createCustomPublic(userId: number, dto: CreateCustomPublicDto, filePath: string)
+
+// ✅ Método 6: Cancelar públicos customizados
+async updateCustomPublic(userId: number, id: number, dto: UpdateCustomPublicDto)
+
+// ✅ Método 7: Criar público filtrado por labels
+async createLabelPublic(userId: number, dto: CreateLabelPublicDto)
+
+// ✅ Método 8: Contagem simplificada (helper interno)
+async countSimplifiedPublic(userId: number, publicId: number)
+```
+
+**Destaques técnicos implementados**:
+- ✅ Query complexa com TypeORM QueryBuilder (Brackets para OR conditions)
+- ✅ Filtros por labels (JSON array)
+- ✅ Busca por nome/número com LIKE
+- ✅ Group by contact.number
+- ✅ Cancelamento de públicos em andamento (status 2)
+- ✅ Verificação de número WhatsApp ativo
+- ✅ TODOs marcados para FASE 5 (jobs assíncronos)
+
+### ⏳ Pendente
+
+#### 4. Controller Endpoints (8 rotas) - **PRÓXIMO PASSO**
+
+**Arquivo a modificar**: `src/campaigns/campaigns.controller.ts`
+
+**Endpoints a adicionar**:
+
+```typescript
+// 1. GET /api/v1/campaigns/simplified/public
+@Get('simplified/public')
+@HttpCode(HttpStatus.OK)
+@ApiOperation({
+  summary: 'Listar contatos de público simplificado',
+  description: 'Lista contatos de um público simplificado com filtros...',
+})
+async listSimplifiedPublic(@Request() req, @Query() dto: ListSimplifiedPublicDto) {
+  const result = await this.campaignsService.listSimplifiedPublic(req.user.id, dto);
+  return { data: result };
+}
+
+// 2. GET /api/v1/campaigns/simplified/public/:id
+@Get('simplified/public/:id')
+@HttpCode(HttpStatus.OK)
+@ApiOperation({
+  summary: 'Mostrar público simplificado',
+  description: 'Retorna informações de um público simplificado...',
+})
+async showSimplifiedPublic(@Request() req, @Param('id', ParseIntPipe) id: number) {
+  const result = await this.campaignsService.showSimplifiedPublic(req.user.id, id);
+  return result;
+}
+
+// 3. POST /api/v1/campaigns/simplified/public
+@Post('simplified/public')
+@HttpCode(HttpStatus.CREATED)
+@ApiOperation({
+  summary: 'Criar público simplificado',
+  description: 'Cria um novo público simplificado...',
+})
+async createSimplifiedPublic(@Request() req, @Body() dto: CreateSimplifiedPublicDto) {
+  const result = await this.campaignsService.createSimplifiedPublic(req.user.id, dto);
+  return result;
+}
+
+// 4. PUT /api/v1/campaigns/simplified/public/:id
+@Put('simplified/public/:id')
+@HttpCode(HttpStatus.CREATED)  // Laravel retorna 201 no PUT
+@ApiOperation({
+  summary: 'Atualizar/cancelar público simplificado',
+  description: 'Cancela públicos simplificados em andamento...',
+})
+async updateSimplifiedPublic(
+  @Request() req,
+  @Param('id', ParseIntPipe) id: number,
+  @Body() dto: UpdateSimplifiedPublicDto,
+) {
+  const result = await this.campaignsService.updateSimplifiedPublic(req.user.id, id, dto);
+  return result;
+}
+
+// 5. POST /api/v1/campaigns/custom/public
+@Post('custom/public')
+@HttpCode(HttpStatus.CREATED)
+@UseInterceptors(
+  FileInterceptor('file', {
+    storage: diskStorage({
+      destination: './uploads/custom_publics',
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const ext = extname(file.originalname);
+        cb(null, `custom-public-${uniqueSuffix}${ext}`);
+      },
+    }),
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+          file.mimetype === 'application/vnd.ms-excel') {
+        cb(null, true);
+      } else {
+        cb(new BadRequestException('Apenas arquivos .xlsx são permitidos.'), false);
+      }
+    },
+  }),
+)
+@ApiConsumes('multipart/form-data')
+@ApiOperation({
+  summary: 'Criar público customizado',
+  description: 'Cria um público customizado a partir de arquivo XLSX...',
+})
+async createCustomPublic(
+  @Request() req,
+  @Body() dto: CreateCustomPublicDto,
+  @UploadedFile() file: Express.Multer.File,
+) {
+  if (!file) {
+    throw new BadRequestException('O arquivo é obrigatório.');
   }
+  const result = await this.campaignsService.createCustomPublic(req.user.id, dto, file.path);
+  return result;
+}
+
+// 6. GET /api/v1/campaigns/custom/public
+// Reusa o método listSimplifiedPublic (mesma lógica no Laravel)
+@Get('custom/public')
+@HttpCode(HttpStatus.OK)
+@ApiOperation({
+  summary: 'Listar contatos de público customizado',
+  description: 'Lista contatos de um público customizado (reusa lógica de simplificado)...',
+})
+async listCustomPublic(@Request() req, @Query() dto: ListSimplifiedPublicDto) {
+  const result = await this.campaignsService.listSimplifiedPublic(req.user.id, dto);
+  return { data: result };
+}
+
+// 7. PUT /api/v1/campaigns/custom/public/:id
+@Put('custom/public/:id')
+@HttpCode(HttpStatus.CREATED)  // Laravel retorna 201 no PUT
+@ApiOperation({
+  summary: 'Atualizar/cancelar público customizado',
+  description: 'Cancela públicos customizados em andamento...',
+})
+async updateCustomPublic(
+  @Request() req,
+  @Param('id', ParseIntPipe) id: number,
+  @Body() dto: UpdateCustomPublicDto,
+) {
+  const result = await this.campaignsService.updateCustomPublic(req.user.id, id, dto);
+  return result;
+}
+
+// 8. POST /api/v1/campaigns/label/public
+@Post('label/public')
+@HttpCode(HttpStatus.CREATED)
+@ApiOperation({
+  summary: 'Criar público filtrado por etiquetas',
+  description: 'Cria um público filtrado por etiquetas específicas...',
+})
+async createLabelPublic(@Request() req, @Body() dto: CreateLabelPublicDto) {
+  const result = await this.campaignsService.createLabelPublic(req.user.id, dto);
+  return result;
 }
 ```
 
-### 2. Estrutura de Service
-
-```typescript
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-
-@Injectable()
-export class ExemploService {
-  constructor(
-    @InjectRepository(Entity)
-    private entityRepository: Repository<Entity>,
-  ) {}
-
-  async metodo(userId: number): Promise<Entity[]> {
-    // SEMPRE filtrar por user_id para segurança
-    const result = await this.entityRepository.find({
-      where: { user_id: userId },
-    });
-
-    if (!result) {
-      throw new NotFoundException('Mensagem em português.');
-    }
-
-    return result;
-  }
-}
-```
-
-### 3. DTOs com Validação
-
-```typescript
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, ... } from 'class-validator';
-import { Type } from 'class-transformer';
-
-export class ExemploDto {
-  @ApiProperty({
-    description: 'Descrição do campo',
-    example: 'valor-exemplo',
-  })
-  @IsNotEmpty({ message: 'O campo X é obrigatório.' })
-  @IsString({ message: 'O campo X deve ser uma string.' })
-  campo: string;
-
-  @ApiPropertyOptional({
-    description: 'Campo opcional',
-    example: 123,
-  })
-  @IsOptional()
-  @IsInt({ message: 'O campo Y deve ser um número inteiro.' })
-  @Type(() => Number)
-  campoOpcional?: number;
-}
-```
-
-### 4. Entities TypeORM
-
+**Imports necessários no controller**:
 ```typescript
 import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  DeleteDateColumn,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
+  UseInterceptors,
+  UploadedFile,
+  ParseIntPipe,
+  BadRequestException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+import { ApiConsumes } from '@nestjs/swagger';
 
-/**
- * Entity Name
- * Maps to existing Laravel 'table_name' table
- * NEVER modify table structure - use existing schema
- */
-@Entity('table_name')
-export class EntityName {
-  @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
-  id: number;
-
-  @Column({ type: 'bigint', unsigned: true })
-  user_id: number;
-
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  campo: string | null;
-
-  @CreateDateColumn()
-  created_at: Date;
-
-  @UpdateDateColumn()
-  updated_at: Date;
-
-  @DeleteDateColumn({ nullable: true })
-  deleted_at: Date | null;
-
-  // Relationships
-  @ManyToOne(() => User)
-  @JoinColumn({ name: 'user_id' })
-  user: User;
-}
+// Importar novos DTOs
+import { ListSimplifiedPublicDto } from './dto/list-simplified-public.dto';
+import { CreateSimplifiedPublicDto } from './dto/create-simplified-public.dto';
+import { UpdateSimplifiedPublicDto } from './dto/update-simplified-public.dto';
+import { CreateCustomPublicDto } from './dto/create-custom-public.dto';
+import { UpdateCustomPublicDto } from './dto/update-custom-public.dto';
+import { CreateLabelPublicDto } from './dto/create-label-public.dto';
 ```
 
-### 5. Testes E2E
+**Nota importante**: Criar diretório para uploads:
+```bash
+mkdir -p uploads/custom_publics
+```
 
+#### 5. Testes E2E (24 testes) - Depois dos endpoints
+
+**Arquivo a criar**: `test/campaigns/campaigns-publics.e2e-spec.ts`
+
+**Estrutura dos testes**:
 ```typescript
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, ValidationPipe } from '@nestjs/common';
-import { useContainer } from 'class-validator';
-import request from 'supertest';
-import { AppModule } from '../../src/app.module';
-import { DataSource } from 'typeorm';
-import { BadRequestToValidationFilter } from '../../src/common/filters/bad-request-to-validation.filter';
+describe('Campaigns - Públicos Simplificados/Custom (E2E)', () => {
+  // Setup/teardown (login, cleanup)
 
-describe('Modulo (E2E)', () => {
-  let app: INestApplication;
-  let dataSource: DataSource;
-  let authToken: string;
-  let testUser: User;
-
-  beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
-      imports: [AppModule],
-    }).compile();
-
-    app = moduleFixture.createNestApplication();
-    useContainer(app.select(AppModule), { fallbackOnErrors: true });
-    app.useGlobalFilters(new BadRequestToValidationFilter());
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: false,
-        transform: true,
-        transformOptions: { enableImplicitConversion: true },
-      }),
-    );
-
-    await app.init();
-    dataSource = app.get(DataSource);
-
-    // Create test user and login
-    await createTestUser();
-    const loginResponse = await request(app.getHttpServer())
-      .post('/api/v1/login')
-      .send({ email: 'test@test.com', password: 'password123' })
-      .expect(200);
-    authToken = loginResponse.body.token;
+  describe('GET /api/v1/campaigns/simplified/public', () => {
+    it('should list simplified public contacts with public_id');
+    it('should list with labels filter (PROJECT=verte)');
+    it('should list with search term');
+    it('should return 401 without auth');
   });
 
-  afterAll(async () => {
-    // Cleanup in correct order (foreign keys!)
-    if (testUser) {
-      await dataSource.getRepository(DependentEntity).delete({ user_id: testUser.id });
-      await dataSource.getRepository(User).delete({ id: testUser.id });
-    }
-    await app.close();
+  describe('GET /api/v1/campaigns/simplified/public/:id', () => {
+    it('should show simplified public details');
+    it('should return 404 if not found');
+    it('should return 401 without auth');
   });
 
-  describe('GET /endpoint', () => {
-    it('should return success', () => {
-      return request(app.getHttpServer())
-        .get('/endpoint')
-        .set('Authorization', `Bearer ${authToken}`)
-        .expect(200)
-        .expect((res) => {
-          expect(res.body).toHaveProperty('data');
-        });
-    });
+  describe('POST /api/v1/campaigns/simplified/public', () => {
+    it('should create simplified public');
+    it('should validate required field id');
+    it('should use active number if numberId not provided');
+    it('should return 401 without auth');
+  });
 
-    it('should return 401 without auth', () => {
-      return request(app.getHttpServer())
-        .get('/endpoint')
-        .expect(401);
-    });
+  describe('PUT /api/v1/campaigns/simplified/public/:id', () => {
+    it('should cancel simplified publics when cancel=true');
+    it('should return 201 status (Laravel compat)');
+    it('should return 401 without auth');
+  });
+
+  describe('POST /api/v1/campaigns/custom/public', () => {
+    it('should create custom public with XLSX file');
+    it('should validate file is required');
+    it('should reject non-XLSX files');
+    it('should respect 20MB file size limit');
+    it('should return 401 without auth');
+  });
+
+  describe('GET /api/v1/campaigns/custom/public', () => {
+    it('should list custom public contacts');
+    it('should return 401 without auth');
+  });
+
+  describe('PUT /api/v1/campaigns/custom/public/:id', () => {
+    it('should cancel custom publics when cancel=true');
+    it('should return 201 status (Laravel compat)');
+    it('should return 401 without auth');
+  });
+
+  describe('POST /api/v1/campaigns/label/public', () => {
+    it('should create label-filtered public');
+    it('should validate required fields (id, label)');
+    it('should validate label is array');
+    it('should return 401 without auth');
   });
 });
 ```
 
+#### 6. Atualizar Documentação
+
+**Arquivo**: `README.md`
+
+Atualizar seção de progresso:
+```markdown
+### Fase 2: Core Business ⏳ Em Progresso
+
+- [x] **Módulo Auth (6 endpoints) ✅ COMPLETO**
+- [x] **Módulo Plans (5 endpoints) ✅ COMPLETO**
+- [x] **Módulo Users (8 endpoints) ✅ COMPLETO**
+- [x] **Módulo Contacts (9 endpoints) ✅ COMPLETO**
+- [x] **Módulo Labels (3 endpoints) ✅ COMPLETO**
+- [x] **Módulo Campaigns FASE 1 (4 endpoints) ✅ COMPLETO**
+- [ ] **Módulo Campaigns FASE 2 (8 endpoints) ⏳ 60% - Service completo, falta controller**
+
+**Progresso Geral**: 40.5% (49 de 121 endpoints quando FASE 2 completar)
+```
+
 ---
 
-## ✅ CHECKLIST DE QUALIDADE (Para cada módulo)
+## 📚 REFERÊNCIAS LARAVEL - FASE 2
 
-Antes de considerar um módulo completo:
+### Controller Laravel
+**Arquivo**: `../verte-back/app/Http/Controllers/CampaignsController.php`
 
-### Código
-- [ ] Entity criada mapeando tabela Laravel existente
-- [ ] DTOs com validações em português
-- [ ] Service com lógica de negócio
-- [ ] Controller com Swagger completo
-- [ ] Module criado e registrado no AppModule
-- [ ] Build sem erros (`npm run build`)
+**Métodos mapeados**:
+- Lines 47-104: `index_simplified_public()` → `listSimplifiedPublic()`
+- Lines 106-122: `show_simplified_public()` → `showSimplifiedPublic()`
+- Lines 124-170: `store_simplified_public()` → `createSimplifiedPublic()`
+- Lines 172-181: `put_simplified_public()` → `updateSimplifiedPublic()`
+- Lines 183-192: `put_custom_public()` → `updateCustomPublic()`
+- Lines 194-253: `store_custom_public()` → `createCustomPublic()`
+- Lines 753-803: `store_label_public()` → `createLabelPublic()`
 
-### Testes
-- [ ] Testes E2E cobrindo todos endpoints
-- [ ] Cenários positivos E negativos
-- [ ] Validação de autenticação (401)
-- [ ] Validação de erros (422, 400, 404)
-- [ ] 100% dos testes passando
+### Observações Importantes
 
-### Documentação Swagger
-- [ ] `@ApiTags` no controller
-- [ ] `@ApiOperation` em cada endpoint
-- [ ] `@ApiResponse` para status 200/201
-- [ ] `@ApiResponse` para erros (400/401/404/422)
-- [ ] `@ApiBearerAuth` se protegido
-- [ ] `@ApiProperty` em todos campos de DTO
-- [ ] Exemplos realistas
-- [ ] Descrições em português
+1. **Status 201 em PUT**: Laravel retorna status 201 nos endpoints PUT (não 200)
+   ```typescript
+   @HttpCode(HttpStatus.CREATED)  // 201, não 200
+   ```
 
-### Compatibilidade Laravel
-- [ ] Responses com wrapper `{ data: ... }`
-- [ ] Status codes corretos (200, 201, 204, 400, 401, 404, 422)
-- [ ] Mensagens de validação em português
-- [ ] Mesma estrutura de dados
-- [ ] Mesmo comportamento de negócio
-- [ ] Filtro por `user_id` em todas queries
+2. **Reutilização de métodos**:
+   - `GET /campaigns/custom/public` reusa `listSimplifiedPublic()`
+   - Mesmo comportamento no Laravel
+
+3. **Upload de arquivos**:
+   - Máximo 20MB
+   - Apenas .xlsx/.xls
+   - Salvar em `uploads/custom_publics/`
+   - Nome: `custom-public-{timestamp}-{random}.xlsx`
+
+4. **TODOs para FASE 5**:
+   - Implementar `checkInstaceConnect()` (verificar conexão WhatsApp)
+   - Dispatch `SimplifiedPublicJob` (processar público assíncrono)
+   - Dispatch `CustomPublicJob` (processar XLSX assíncrono)
+
+---
+
+## 🔧 PADRÕES ESTABELECIDOS
+
+### Upload de Arquivos com Multer
+
+```typescript
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+
+@UseInterceptors(
+  FileInterceptor('file', {
+    storage: diskStorage({
+      destination: './uploads/custom_publics',
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        const ext = extname(file.originalname);
+        cb(null, `custom-public-${uniqueSuffix}${ext}`);
+      },
+    }),
+    limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.includes('spreadsheet') || file.mimetype.includes('excel')) {
+        cb(null, true);
+      } else {
+        cb(new BadRequestException('Apenas arquivos .xlsx são permitidos.'), false);
+      }
+    },
+  }),
+)
+@ApiConsumes('multipart/form-data')
+async uploadMethod(@UploadedFile() file: Express.Multer.File) {
+  if (!file) {
+    throw new BadRequestException('O arquivo é obrigatório.');
+  }
+  // file.path contém o caminho completo do arquivo salvo
+}
+```
+
+### Query Complexa com TypeORM QueryBuilder
+
+```typescript
+let query = this.contactRepository
+  .createQueryBuilder('contact')
+  .leftJoin('contact.public_by_contact', 'pbc')
+  .where('pbc.public_id = :publicId', { publicId })
+  .andWhere('contact.user_id = :userId', { userId });
+
+// OR conditions com Brackets
+if (labels && labels.length > 0) {
+  const labelsToFilter = labels; // TypeScript narrowing
+  query = query.andWhere(
+    new Brackets((qb) => {
+      labelsToFilter.forEach((label, index) => {
+        if (index === 0) {
+          qb.where('pbc.label LIKE :label0', { label0: `%${label}%` });
+        } else {
+          qb.orWhere(`pbc.label LIKE :label${index}`, { [`label${index}`]: `%${label}%` });
+        }
+      });
+    }),
+  );
+}
+
+// Search com sanitização
+if (search) {
+  const cleanSearch = search.replace(/\D/g, '');
+  query = query.andWhere(
+    new Brackets((qb) => {
+      qb.where('contact.name LIKE :search', { search: `%${search}%` })
+        .orWhere('contact.number LIKE :cleanSearch', { cleanSearch: `%${cleanSearch}%` });
+    }),
+  );
+}
+
+// Group by (Laravel groupBy)
+query = query.groupBy('contact.number');
+
+const contacts = await query.getMany();
+```
+
+---
+
+## ✅ CHECKLIST PRÓXIMA SESSÃO
+
+### Implementação Controller (Passo 4)
+- [ ] Criar diretório `uploads/custom_publics/`
+- [ ] Adicionar imports necessários no controller
+- [ ] Implementar 8 endpoints conforme código acima
+- [ ] Adicionar decoradores Swagger completos (@ApiOperation, @ApiResponse)
+- [ ] Testar compilação: `npm run build`
+- [ ] Testar endpoints no Swagger: `http://localhost:3000/api/docs`
+
+### Testes E2E (Passo 5)
+- [ ] Criar arquivo `test/campaigns/campaigns-publics.e2e-spec.ts`
+- [ ] Implementar setup (login, test data)
+- [ ] Implementar 24 testes (3 por endpoint em média)
+- [ ] Testar cenários positivos e negativos
+- [ ] Validar erros de autenticação (401)
+- [ ] Validar erros de validação (422)
+- [ ] Executar testes: `npm run test:e2e -- test/campaigns/campaigns-publics.e2e-spec.ts`
+- [ ] Garantir 100% de sucesso
+
+### Documentação (Passo 6)
+- [ ] Atualizar README.md (progresso 40.5% - 49/121)
+- [ ] Adicionar Campaigns FASE 2 à lista de módulos completos
+- [ ] Atualizar badge de progresso
+
+### Validação Final
+- [ ] `npm run build` sem erros
+- [ ] `npm run lint` sem erros críticos
+- [ ] Todos os testes E2E passando
+- [ ] Swagger acessível e funcional
+- [ ] Endpoints testados manualmente
 
 ---
 
@@ -397,16 +508,230 @@ npm run build                  # Compilar TypeScript
 
 # Testes
 npm run test:e2e               # Todos os testes E2E
-npm run test:e2e -- test/modulo/modulo.e2e-spec.ts  # Teste específico
+npm run test:e2e -- test/campaigns/campaigns-publics.e2e-spec.ts  # Teste específico
 
 # Utilitários
 npm run lint                   # ESLint
 npm run format                 # Prettier
 
-# Verificar tabelas do banco
-# MySQL via terminal
-mysql -h localhost -P 5306 -u root -proot verte_production
+# Criar diretório de uploads
+mkdir -p uploads/custom_publics
 ```
+
+---
+
+## 🐛 PROBLEMAS CONHECIDOS E SOLUÇÕES
+
+### 1. TypeScript: dto.labels possibly undefined
+
+**Problema**:
+```typescript
+dto.labels.forEach((label) => {  // Error: possibly undefined
+  // ...
+});
+```
+
+**Solução**: Type narrowing com const
+```typescript
+if (dto.labels && dto.labels.length > 0) {
+  const labels = dto.labels; // TypeScript agora sabe que não é undefined
+  labels.forEach((label, index) => {
+    // ...
+  });
+}
+```
+
+### 2. Multer File Type
+
+**Problema**: TypeScript não reconhece `Express.Multer.File`
+
+**Solução**: Instalar types
+```bash
+npm install --save-dev @types/multer
+```
+
+E usar tipo correto:
+```typescript
+@UploadedFile() file: Express.Multer.File
+```
+
+### 3. File Upload 413 Payload Too Large
+
+**Problema**: NestJS rejeita uploads grandes
+
+**Solução**: Configurar body parser no `main.ts`
+```typescript
+// src/main.ts
+import { NestFactory } from '@nestjs/core';
+import * as express from 'express';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  // Aumentar limite de upload
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+  await app.listen(3000);
+}
+```
+
+---
+
+## 📊 MÉTRICAS DE PROGRESSO
+
+### Endpoints por Categoria
+```
+Autenticação:        6/6    (100%) ✅
+Planos:              5/5    (100%) ✅
+Usuários:            8/8    (100%) ✅
+Contatos:            9/9    (100%) ✅
+Labels:              3/3    (100%) ✅
+Campanhas FASE 1:    4/4    (100%) ✅
+Campanhas FASE 2:    0/8    (0%)   ← 60% service completo, falta controller
+Campanhas FASE 3:    0/4    (0%)
+Campanhas FASE 4:    0/3    (0%)
+Campanhas FASE 5:    0/2    (0%)
+WhatsApp:            0/15   (0%)
+Pagamentos:          0/5    (0%)
+Admin:               0/16   (0%)
+Utilities:           0/X    (0%)
+──────────────────────────────────
+Total Live:         35/121  (28.9%)
+Total + Service:    41/121  (33.9%)
+```
+
+### Qualidade dos Testes
+```
+Total de testes E2E: 150
+Taxa de sucesso: 100%
+Cobertura: 35 endpoints testados
+```
+
+---
+
+## 📁 ESTRUTURA DO PROJETO ATUAL
+
+```
+src/
+├── auth/                          ✅ 6 endpoints
+├── plans/                         ✅ 5 endpoints
+├── users/                         ✅ 8 endpoints
+├── contacts/                      ✅ 9 endpoints
+├── labels/                        ✅ 3 endpoints
+├── campaigns/                     ⏳ 4/21 endpoints
+│   ├── dto/
+│   │   ├── list-campaigns.dto.ts                   ✅
+│   │   ├── create-campaign.dto.ts                  ✅
+│   │   ├── update-campaign.dto.ts                  ✅
+│   │   ├── duplicate-campaign.dto.ts               ✅
+│   │   ├── list-simplified-public.dto.ts           ✅ FASE 2
+│   │   ├── create-simplified-public.dto.ts         ✅ FASE 2
+│   │   ├── update-simplified-public.dto.ts         ✅ FASE 2
+│   │   ├── create-custom-public.dto.ts             ✅ FASE 2
+│   │   ├── update-custom-public.dto.ts             ✅ FASE 2
+│   │   └── create-label-public.dto.ts              ✅ FASE 2
+│   ├── campaigns.controller.ts     ✅ 4 endpoints, falta adicionar 8
+│   ├── campaigns.service.ts        ✅ 4 métodos + 8 métodos FASE 2
+│   └── campaigns.module.ts         ✅
+├── database/
+│   └── entities/
+│       ├── user.entity.ts          ✅
+│       ├── plan.entity.ts          ✅
+│       ├── number.entity.ts        ✅
+│       ├── contact.entity.ts       ✅
+│       ├── label.entity.ts         ✅
+│       ├── campaign.entity.ts      ✅
+│       ├── simplified-public.entity.ts  ✅
+│       └── custom-public.entity.ts      ✅
+└── common/
+    ├── filters/
+    ├── guards/
+    ├── validators/
+    └── helpers/
+
+test/
+├── auth/                          ✅ 27 testes
+├── plans/                         ✅ 15 testes
+├── users/                         ✅ 24 testes
+├── contacts/                      ✅ 57 testes
+├── labels/                        ✅ 15 testes
+└── campaigns/
+    ├── campaigns-basic.e2e-spec.ts     ✅ 12 testes
+    └── campaigns-publics.e2e-spec.ts   ❌ CRIAR (24 testes)
+
+uploads/
+└── custom_publics/                ❌ CRIAR diretório
+```
+
+---
+
+## 🎯 ESTRATÉGIA DE IMPLEMENTAÇÃO
+
+### Campanhas - Fases Restantes
+
+```
+✅ FASE 1: Operações Básicas (4 endpoints)
+   - GET /campaigns
+   - POST /campaigns
+   - PUT /campaigns/:id
+   - POST /campaigns-duplicate
+
+⏳ FASE 2: Públicos Simplificados/Custom (8 endpoints) - 60% COMPLETO
+   - GET /campaigns/simplified/public           ❌ Falta controller
+   - GET /campaigns/simplified/public/:id       ❌ Falta controller
+   - POST /campaigns/simplified/public          ❌ Falta controller
+   - PUT /campaigns/simplified/public/:id       ❌ Falta controller
+   - POST /campaigns/custom/public              ❌ Falta controller
+   - GET /campaigns/custom/public               ❌ Falta controller
+   - PUT /campaigns/custom/public/:id           ❌ Falta controller
+   - POST /campaigns/label/public               ❌ Falta controller
+
+⏸️ FASE 3: Operações Avançadas (4 endpoints)
+   - DELETE /campaigns/:id
+   - GET /campaigns/:id/info
+   - POST /campaigns/:id/change-status
+   - POST /campaigns/:id/show-messages
+
+⏸️ FASE 4: Analytics (3 endpoints)
+   - GET /campaigns/total-campaign
+   - GET /campaigns/:id/statistic
+   - GET /campaigns/:id/analytics
+
+⏸️ FASE 5: Jobs e Processamento (2 endpoints + jobs)
+   - GET /campaigns/status-processing
+   - POST /campaigns/force-check
+   - Implementar SimplifiedPublicJob
+   - Implementar CustomPublicJob
+```
+
+---
+
+## 🔜 PRÓXIMOS PASSOS IMEDIATOS
+
+### 1. Adicionar Endpoints no Controller (15-30 minutos)
+- Abrir `src/campaigns/campaigns.controller.ts`
+- Adicionar imports necessários (DTOs, Multer, decoradores)
+- Copiar e colar os 8 métodos fornecidos acima
+- Criar diretório: `mkdir -p uploads/custom_publics`
+
+### 2. Testar Compilação (2 minutos)
+```bash
+npm run build
+```
+
+### 3. Testar no Swagger (5-10 minutos)
+- Abrir `http://localhost:3000/api/docs`
+- Verificar se os 8 novos endpoints aparecem
+- Testar alguns endpoints com "Try it out"
+
+### 4. Criar Testes E2E (30-45 minutos)
+- Criar `test/campaigns/campaigns-publics.e2e-spec.ts`
+- Implementar 24 testes seguindo estrutura fornecida
+- Executar e validar 100% de sucesso
+
+### 5. Atualizar Documentação (5 minutos)
+- Atualizar README.md com progresso 40.5% (49/121)
 
 ---
 
@@ -425,219 +750,16 @@ mysql -h localhost -P 5306 -u root -proot verte_production
 ### ✅ SEMPRE FAZER
 
 1. ✅ Consultar código Laravel em `../verte-back/`
-2. ✅ Ler documentação em `docs/migration/`
-3. ✅ Manter URIs idênticas
-4. ✅ Preservar estrutura de responses
-5. ✅ Validações em português
-6. ✅ Usar mesmo banco de dados
-7. ✅ Filtrar por `user_id` em queries
-8. ✅ Escrever testes E2E completos
+2. ✅ Manter URIs idênticas
+3. ✅ Preservar estrutura de responses (`{ data: ... }`)
+4. ✅ Validações em português
+5. ✅ Filtrar por `user_id` em queries
+6. ✅ Escrever testes E2E completos
+7. ✅ Documentação Swagger completa
 
 ---
 
-## 📚 ARQUIVOS DE REFERÊNCIA
-
-### Documentação do Projeto
-```
-docs/migration/
-├── README.md                    - Visão geral
-├── routes-inventory.md          - 121 rotas documentadas
-├── business-rules.md            - Regras de negócio
-├── database-schema.md           - 22+ tabelas
-└── models-relationships.md      - Relacionamentos
-
-docs/migration-specs/
-└── migration-master-spec.md     - ⚠️ REGRAS CRÍTICAS
-
-docs/
-└── swagger-standards.md         - Padrões Swagger
-```
-
-### Código Laravel Original
-```
-../verte-back/
-├── app/Http/Controllers/        - Controllers Laravel
-├── app/Models/                  - Models Eloquent
-├── app/Services/                - Services Laravel
-├── routes/api.php               - Rotas definidas
-└── database/migrations/         - Schema das tabelas
-```
-
----
-
-## 🎯 ESTRATÉGIA DE IMPLEMENTAÇÃO
-
-### Ordem Recomendada de Módulos
-
-```
-✅ 1. Auth (6)         - Base, autenticação
-✅ 2. Plans (5)        - Independente, simples
-✅ 3. Users (8)        - Gestão de usuários
-✅ 4. Contacts (9)     - CRUD + import/export
-✅ 5. Labels (3)       - Tags para contatos
-→  6. Públicos (6)     - PRÓXIMO - Audiências
-   7. Campanhas (21)   - Core do negócio
-   8. WhatsApp (15)    - Integração WAHA
-   9. Pagamentos (5)   - Stripe/MercadoPago
-   10. Admin (16)      - Gestão admin
-   11. Utilities (?)   - Diversos
-```
-
-### Por que Públicos é o próximo?
-
-1. ✅ Labels já implementado (dependência)
-2. ✅ Contacts já implementado (dependência)
-3. ⚠️ Necessário para Campanhas
-4. 🔴 Complexo, mas gerenciável
-
----
-
-## 🐛 PROBLEMAS CONHECIDOS E SOLUÇÕES
-
-### 1. TypeScript: Type 'X | null' is not assignable
-
-**Problema**:
-```typescript
-let variable: Entity;
-variable = await repository.findOne(...); // Error!
-```
-
-**Solução**:
-```typescript
-let variable: Entity | null;
-variable = await repository.findOne(...);
-
-if (!variable) {
-  throw new NotFoundException('Mensagem em português.');
-}
-// Agora variable é garantido não-null
-```
-
-### 2. Import Type Error (Decorators)
-
-**Problema**:
-```typescript
-import { Response } from 'express';  // Error!
-```
-
-**Solução**:
-```typescript
-import type { Response } from 'express';
-```
-
-### 3. Foreign Key Constraints em Testes
-
-**Problema**: Erro ao deletar user que tem dependências
-
-**Solução**: Deletar na ordem correta
-```typescript
-afterAll(async () => {
-  // 1. Deletar dependências primeiro
-  await dataSource.getRepository(Contact).delete({ user_id: testUser.id });
-  await dataSource.getRepository(Number).delete({ user_id: testUser.id });
-  // 2. Deletar user por último
-  await dataSource.getRepository(User).delete({ id: testUser.id });
-});
-```
-
-### 4. CSV Parser Import Error
-
-**Problema**:
-```typescript
-import * as csvParser from 'csv-parser'; // Error!
-```
-
-**Solução**:
-```typescript
-import csvParser from 'csv-parser';
-```
-
----
-
-## 📊 MÉTRICAS DE PROGRESSO
-
-### Endpoints por Categoria
-```
-Autenticação:    6/6   (100%) ✅
-Usuários:       8/8   (100%) ✅
-Planos:         5/5   (100%) ✅
-Contatos:       9/9   (100%) ✅
-Labels:         3/3   (100%) ✅
-Públicos:       0/6   (0%)   ← PRÓXIMO
-Campanhas:      0/21  (0%)
-WhatsApp:       0/15  (0%)
-Pagamentos:     0/5   (0%)
-Admin:          0/16  (0%)
-Utilities:      0/X   (0%)
-────────────────────────────
-Total:         31/121 (25.6%)
-```
-
-### Qualidade dos Testes
-```
-Total de testes E2E: 138
-Taxa de sucesso: 100%
-Cobertura: 31 endpoints testados
-```
-
----
-
-## 🔜 PRÓXIMOS PASSOS IMEDIATOS
-
-### Para Continuar com Públicos:
-
-1. **Criar Entities** (verificar schema no Laravel):
-   ```typescript
-   src/database/entities/public.entity.ts
-   src/database/entities/public-by-contact.entity.ts
-   ```
-
-2. **Analisar Controller Laravel**:
-   ```bash
-   cat ../verte-back/app/Http/Controllers/PublicsController.php
-   ```
-
-3. **Verificar Models**:
-   ```bash
-   cat ../verte-back/app/Models/Publics.php
-   cat ../verte-back/app/Models/PublicByContact.php
-   ```
-
-4. **Criar módulo básico**:
-   ```
-   src/publics/
-   ├── dto/
-   ├── publics.controller.ts
-   ├── publics.service.ts
-   └── publics.module.ts
-   ```
-
-5. **Implementar queries complexas** (COUNT, GROUP BY, subqueries)
-
-6. **Testes E2E completos**
-
----
-
-## 💡 DICAS IMPORTANTES
-
-### Performance
-- Usar `QueryBuilder` para queries complexas
-- Considerar cache (Redis) mais tarde
-- Otimizar N+1 queries com `relations`
-
-### Segurança
-- SEMPRE filtrar por `user_id`
-- Validar `number_id` pertence ao user
-- Usar JWT em todas rotas protegidas
-
-### Manutenibilidade
-- Comentários em português
-- Documentação Swagger completa
-- Testes cobrindo edge cases
-
----
-
-## 📞 INFORMAÇÕES DE CONTATO DO PROJETO
+## 📞 INFORMAÇÕES DO PROJETO
 
 - **Projeto Original**: Laravel 8 (../verte-back/)
 - **Banco de Dados**: MySQL `verte_production` (porta 5306)
@@ -646,19 +768,20 @@ Cobertura: 31 endpoints testados
 
 ---
 
-## ✅ ÚLTIMA VERIFICAÇÃO ANTES DE NOVA SESSÃO
+## ✅ ÚLTIMA VERIFICAÇÃO
 
 Checklist de handoff:
 - [x] Código compilando sem erros
-- [x] Todos os testes passando (138/138)
-- [x] Módulos registrados no AppModule
-- [x] Documentação Swagger acessível
-- [x] Próximos passos claros
+- [x] Service methods completos e testados
+- [x] DTOs criados e validados
+- [x] Entities existentes e funcionais
+- [x] Próximos passos claros e detalhados
+- [x] Código de exemplo fornecido
 - [x] Padrões documentados
 - [x] Problemas conhecidos documentados
 
 ---
 
-**Status**: ✅ Pronto para nova sessão
-**Próximo módulo**: Públicos (6 endpoints)
-**Última atualização**: 30/Out/2024
+**Status**: ✅ Pronto para implementar Controller (FASE 2 - Passo 4)
+**Tempo estimado**: 1-2 horas para completar FASE 2 (controller + testes + docs)
+**Última atualização**: 04/Nov/2025

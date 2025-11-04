@@ -1,6 +1,6 @@
 # Verte Backend - NestJS
 
-[![Migration Status](https://img.shields.io/badge/migration-25.6%25%20complete-yellow)](https://github.com/seu-org/verte-nestjs)
+[![Migration Status](https://img.shields.io/badge/migration-33.9%25%20complete-yellow)](https://github.com/seu-org/verte-nestjs)
 [![Compatibility](https://img.shields.io/badge/compatibility-100%25-success)](./docs/migration-specs/migration-master-spec.md)
 [![Laravel Original](https://img.shields.io/badge/source-Laravel%208-red)](../verte-back)
 [![Tested](https://img.shields.io/badge/tested-E2E%20100%25-brightgreen)](./test/auth/auth.e2e-spec.ts)
@@ -133,7 +133,7 @@ src/
 
 ## 🔄 Status da Migração
 
-### Progresso Geral: 25.6% (31/121 endpoints)
+### Progresso Geral: 33.9% (41/121 endpoints)
 
 ### Módulos Completos ✅
 
@@ -144,15 +144,16 @@ src/
 | **Users** | 8/8 (100%) | 24/24 ✅ | ✅ Completo |
 | **Contacts** | 9/9 (100%) | 57/57 ✅ | ✅ Completo |
 | **Labels** | 3/3 (100%) | 15/15 ✅ | ✅ Completo |
+| **Públicos** | 6/6 (100%) | 18/18 ✅ | ✅ Completo |
+| **Campaigns (FASE 1)** | 4/21 (19%) | 24/24 ✅ | ✅ CRUD Básico Completo |
 
-**Total**: 31 endpoints, 138 testes E2E passando
+**Total**: 41 endpoints, 180 testes E2E passando
 
 ### Módulos Pendentes ⏸️
 
 | Módulo | Endpoints | Status |
 |--------|-----------|--------|
-| Públicos | 6 | ⏭️ PRÓXIMO |
-| Campaigns | 21 | Pendente (0/21) |
+| Campaigns (FASE 2-6) | 17/21 | ⏭️ PRÓXIMO (81% pendente) |
 | WhatsApp | 15 | Pendente (0/15) |
 | Payments | 5 | Pendente (0/5) |
 | Admin | 16 | Pendente (0/16) |
@@ -187,7 +188,9 @@ npm run test:cov
 | Users | 100% (8/8 endpoints) | 24/24 | ✅ Passing |
 | Contacts | 100% (9/9 endpoints) | 57/57 | ✅ Passing |
 | Labels | 100% (3/3 endpoints) | 15/15 | ✅ Passing |
-| **Total** | **31 endpoints** | **138 testes** | **✅ 100%** |
+| Públicos | 100% (6/6 endpoints) | 18/18 | ✅ Passing |
+| Campaigns (FASE 1) | 100% (4/4 endpoints) | 24/24 | ✅ Passing |
+| **Total** | **41 endpoints** | **180 testes** | **✅ 100%** |
 
 ---
 

@@ -1,5 +1,9 @@
 import { NestFactory, Reflector } from '@nestjs/core';
-import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
+import {
+  ValidationPipe,
+  ClassSerializerInterceptor,
+  BadRequestException,
+} from '@nestjs/common';
 import { useContainer } from 'class-validator';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
@@ -38,6 +42,21 @@ async function bootstrap() {
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,
+      },
+      // Custom exception factory to format errors like Laravel
+      exceptionFactory: (errors) => {
+        const formattedErrors: Record<string, string[]> = {};
+
+        errors.forEach((error) => {
+          if (error.constraints) {
+            formattedErrors[error.property] = Object.values(error.constraints);
+          }
+        });
+
+        return new BadRequestException({
+          errors: formattedErrors,
+          statusCode: 422,
+        });
       },
     }),
   );

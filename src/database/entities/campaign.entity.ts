@@ -12,6 +12,7 @@ import {
 import { User } from './user.entity';
 import { Public } from './public.entity';
 import { Number } from './number.entity';
+import { Message } from './message.entity';
 
 /**
  * Campaign Entity
@@ -75,9 +76,6 @@ export class Campaign {
   @Column({ type: 'int', nullable: true, default: 0 })
   processed_contacts: number | null;
 
-  @Column({ type: 'timestamp', nullable: true })
-  last_send: Date | null;
-
   @Column({ type: 'text', nullable: true })
   labels: string | null;
 
@@ -109,5 +107,6 @@ export class Campaign {
   @JoinColumn({ name: 'number_id' })
   number: Number;
 
-  // messages relationship will be added when Message entity is created
+  @OneToMany(() => Message, (message) => message.campaign)
+  messages: Message[];
 }
