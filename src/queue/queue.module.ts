@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bull';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { redisConfig, QUEUE_NAMES, bullDefaultJobOptions } from '../config/redis.config';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
+import { MonitoringModule } from '../monitoring/monitoring.module';
 
 // Processors
 import { CampaignsProcessor } from './processors/campaigns.processor';
@@ -54,15 +55,24 @@ import { Public } from '../database/entities/public.entity';
       redis: redisConfig,
       defaultJobOptions: bullDefaultJobOptions,
     }),
-    // Registro das queues
+    // Registro das queues principais
     BullModule.registerQueue(
       { name: QUEUE_NAMES.CAMPAIGNS },
       { name: QUEUE_NAMES.SIMPLIFIED_PUBLIC },
       { name: QUEUE_NAMES.CUSTOM_PUBLIC },
       { name: QUEUE_NAMES.WHATSAPP_MESSAGE },
     ),
+    // Registro das Dead Letter Queues
+    BullModule.registerQueue(
+      { name: QUEUE_NAMES.CAMPAIGNS_DLQ },
+      { name: QUEUE_NAMES.SIMPLIFIED_PUBLIC_DLQ },
+      { name: QUEUE_NAMES.CUSTOM_PUBLIC_DLQ },
+      { name: QUEUE_NAMES.WHATSAPP_MESSAGE_DLQ },
+    ),
     // WhatsApp module for WAHA service
     WhatsappModule,
+    // Monitoring module for error tracking
+    MonitoringModule,
   ],
   providers: [
     CampaignsProcessor,

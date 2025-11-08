@@ -1,15 +1,16 @@
-import { Process, Processor } from '@nestjs/bull';
+import { Process, Processor, OnQueueFailed } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
 import type { Job, Queue } from 'bull';
-import { QUEUE_NAMES } from '../../config/redis.config';
+import { QUEUE_NAMES, getDLQName, advancedRetryConfig } from '../../config/redis.config';
 import { Campaign } from '../../database/entities/campaign.entity';
 import { PublicByContact } from '../../database/entities/public-by-contact.entity';
 import { Number } from '../../database/entities/number.entity';
 import { Message } from '../../database/entities/message.entity';
 import { InjectQueue } from '@nestjs/bull';
 import { getErrorStack } from '../queue.helpers';
+import { ErrorTrackingService } from '../../monitoring/error-tracking.service';
 
 /**
  * CampaignsProcessor
@@ -40,6 +41,9 @@ export class CampaignsProcessor {
     private readonly messageRepository: Repository<Message>,
     @InjectQueue(QUEUE_NAMES.WHATSAPP_MESSAGE)
     private readonly whatsappMessageQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.CAMPAIGNS_DLQ)
+    private readonly campaignsDLQ: Queue,
+    private readonly errorTrackingService: ErrorTrackingService,
   ) {}
 
   /**
@@ -299,6 +303,64 @@ export class CampaignsProcessor {
     } catch (error) {
       this.logger.error(`❌ Erro ao atualizar progresso da campanha #${campaignId}`, getErrorStack(error));
       throw error;
+    }
+  }
+
+  /**
+   * Handle failed jobs
+   * Envia jobs falhados para Dead Letter Queue após esgotar tentativas
+   */
+  @OnQueueFailed()
+  async handleFailedJob(job: Job, error: Error) {
+    const { name, data, id, attemptsMade } = job;
+
+    this.logger.error('❌ Job falhou após todas as tentativas', {
+      jobName: name,
+      jobId: id,
+      data,
+      attemptsMade,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    // Track error in monitoring service
+    if (data.campaignId) {
+      await this.errorTrackingService.trackCampaignError(
+        data.campaignId,
+        error,
+        { jobId: id, attemptsMade },
+      );
+    }
+
+    this.errorTrackingService.trackJobError(
+      QUEUE_NAMES.CAMPAIGNS,
+      id,
+      error,
+      { jobName: name, data },
+    );
+
+    // Send to Dead Letter Queue
+    try {
+      await this.campaignsDLQ.add('failed-campaign-job', {
+        originalJob: {
+          name,
+          data,
+          id,
+          attemptsMade,
+        },
+        error: {
+          message: error.message,
+          stack: error.stack,
+        },
+        failedAt: new Date(),
+      }, {
+        attempts: 1, // DLQ não faz retry
+        removeOnComplete: false, // Manter para análise
+      });
+
+      this.logger.log(`📬 Job enviado para Dead Letter Queue: campaigns-dlq`);
+    } catch (dlqError) {
+      this.logger.error('❌ Erro ao enviar job para DLQ', getErrorStack(dlqError));
     }
   }
 }
