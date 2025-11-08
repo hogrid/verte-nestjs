@@ -16,6 +16,7 @@ import { ScheduleModule } from './schedule/schedule.module';
 import { PaymentsModule } from './payments/payments.module';
 import { FilesModule } from './files/files.module';
 import { TemplatesModule } from './templates/templates.module';
+import { ExportModule } from './export/export.module';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { TemplatesModule } from './templates/templates.module';
     PaymentsModule, // Stripe payments (4 endpoints)
     FilesModule, // File upload/download (3 endpoints)
     TemplatesModule, // Message templates with variables (4 endpoints)
+    ExportModule, // Export contacts/reports to CSV (2 endpoints)
   ],
   controllers: [AppController],
   providers: [AppService],
