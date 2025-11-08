@@ -7,3 +7,4 @@ export * from './password-reset.entity';
 export * from './payment.entity';
 export * from './file.entity';
 export * from './message-template.entity';
+export * from './setting.entity';

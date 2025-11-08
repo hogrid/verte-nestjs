@@ -17,6 +17,7 @@ import { PaymentsModule } from './payments/payments.module';
 import { FilesModule } from './files/files.module';
 import { TemplatesModule } from './templates/templates.module';
 import { ExportModule } from './export/export.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { ExportModule } from './export/export.module';
     FilesModule, // File upload/download (3 endpoints)
     TemplatesModule, // Message templates with variables (4 endpoints)
     ExportModule, // Export contacts/reports to CSV (2 endpoints)
+    AdminModule, // Admin endpoints (11 endpoints - requires administrator profile)
   ],
   controllers: [AppController],
   providers: [AppService],
