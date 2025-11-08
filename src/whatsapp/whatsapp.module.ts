@@ -5,6 +5,8 @@ import { WhatsappController } from './whatsapp.controller';
 import { WhatsappService } from './whatsapp.service';
 import { WahaService } from './waha.service';
 import { Number } from '../database/entities/number.entity';
+import { MessageByContact } from '../database/entities/message-by-contact.entity';
+import { PublicByContact } from '../database/entities/public-by-contact.entity';
 
 /**
  * WhatsappModule
@@ -32,7 +34,7 @@ import { Number } from '../database/entities/number.entity';
 @Module({
   imports: [
     ConfigModule, // Para acessar variáveis de ambiente (WAHA_URL, etc)
-    TypeOrmModule.forFeature([Number]),
+    TypeOrmModule.forFeature([Number, MessageByContact, PublicByContact]),
   ],
   controllers: [WhatsappController],
   providers: [WhatsappService, WahaService],

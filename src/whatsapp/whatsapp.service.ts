@@ -7,9 +7,19 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Number } from '../database/entities/number.entity';
+import { MessageByContact } from '../database/entities/message-by-contact.entity';
+import { PublicByContact } from '../database/entities/public-by-contact.entity';
 import { WahaService } from './waha.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
 import { SendPollDto } from './dto/send-poll.dto';
+import {
+  WahaWebhookEvent,
+  MessageAckPayload,
+  MessageSentPayload,
+  SessionStatusPayload,
+  MessageAckStatus,
+  getAckStatusText,
+} from './dto/webhook-event.dto';
 
 /**
  * WhatsappService
@@ -24,6 +34,10 @@ export class WhatsappService {
   constructor(
     @InjectRepository(Number)
     private readonly numberRepository: Repository<Number>,
+    @InjectRepository(MessageByContact)
+    private readonly messageByContactRepository: Repository<MessageByContact>,
+    @InjectRepository(PublicByContact)
+    private readonly publicByContactRepository: Repository<PublicByContact>,
     private readonly wahaService: WahaService,
   ) {}
 
@@ -467,14 +481,49 @@ export class WhatsappService {
    * Laravel: WhatsappController@webhook
    */
   async handleWebhook(payload: unknown) {
-    this.logger.log('📥 Webhook recebido', { payload });
-
     try {
-      // TODO: Process webhook events
-      // - Message received
-      // - Message sent
-      // - Session status change
-      // - etc.
+      // Validar estrutura do evento
+      if (!this.isWahaWebhookEvent(payload)) {
+        this.logger.warn('⚠️ Webhook recebido com estrutura inválida', {
+          payload,
+        });
+        return {
+          success: false,
+          message: 'Estrutura de webhook inválida',
+        };
+      }
+
+      const event = payload as WahaWebhookEvent;
+
+      this.logger.log('📥 Webhook WAHA recebido', {
+        event: event.event,
+        session: event.session,
+      });
+
+      // Processar diferentes tipos de eventos
+      switch (event.event) {
+        case 'message.ack':
+          await this.handleMessageAck(event);
+          break;
+
+        case 'message.sent':
+          await this.handleMessageSent(event);
+          break;
+
+        case 'session.status':
+          await this.handleSessionStatus(event);
+          break;
+
+        case 'message.any':
+          // Log para debug, mas não processamos aqui
+          this.logger.debug('📩 Mensagem recebida (message.any)', {
+            session: event.session,
+          });
+          break;
+
+        default:
+          this.logger.debug(`📌 Evento não tratado: ${event.event}`);
+      }
 
       return {
         success: true,
@@ -483,8 +532,192 @@ export class WhatsappService {
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar webhook', {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      throw error;
+
+      // Não lançar erro para evitar retry infinito do WAHA
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erro desconhecido',
+      };
     }
+  }
+
+  /**
+   * Type guard para validar estrutura de webhook WAHA
+   */
+  private isWahaWebhookEvent(payload: unknown): payload is WahaWebhookEvent {
+    if (typeof payload !== 'object' || payload === null) {
+      return false;
+    }
+
+    const event = payload as Record<string, unknown>;
+    return (
+      typeof event.event === 'string' &&
+      typeof event.session === 'string' &&
+      'payload' in event
+    );
+  }
+
+  /**
+   * Handle message.ack event
+   * Atualiza status de entrega/leitura de mensagens
+   */
+  private async handleMessageAck(event: WahaWebhookEvent) {
+    try {
+      const payload = event.payload as MessageAckPayload;
+
+      this.logger.log('✅ Processando message.ack', {
+        session: event.session,
+        ack: payload.ack,
+        ackText: getAckStatusText(payload.ack),
+        messageId: payload.id,
+      });
+
+      // Atualizar MessageByContact baseado no ACK status
+      const updates: Partial<MessageByContact> = {};
+
+      switch (payload.ack) {
+        case MessageAckStatus.SERVER_ACK: // 2 - Enviada ao servidor
+        case MessageAckStatus.PENDING: // 1 - Pendente
+          updates.send = 1;
+          break;
+
+        case MessageAckStatus.DELIVERY_ACK: // 3 - Entregue ao destinatário
+          updates.send = 1;
+          updates.delivered = 1;
+          break;
+
+        case MessageAckStatus.READ: // 4 - Lida pelo destinatário
+        case MessageAckStatus.PLAYED: // 5 - Reproduzida (áudio/vídeo)
+          updates.send = 1;
+          updates.delivered = 1;
+          updates.read = 1;
+          break;
+
+        case MessageAckStatus.ERROR: // 0 - Erro
+          updates.error = 'Erro ao enviar mensagem';
+          break;
+      }
+
+      // Atualizar MessageByContact (buscar por número do destinatário)
+      const phoneNumber = this.extractPhoneNumber(payload.to);
+      if (phoneNumber) {
+        await this.messageByContactRepository.update(
+          { number: phoneNumber },
+          updates,
+        );
+
+        // Atualizar PublicByContact se mensagem foi lida
+        if (payload.ack === MessageAckStatus.READ || payload.ack === MessageAckStatus.PLAYED) {
+          await this.publicByContactRepository
+            .createQueryBuilder()
+            .update(PublicByContact)
+            .set({ read: 1 })
+            .where('contact_id IN (SELECT id FROM contacts WHERE number = :phone)', {
+              phone: phoneNumber,
+            })
+            .execute();
+        }
+      }
+
+      this.logger.log('✅ message.ack processado', {
+        phone: phoneNumber,
+        updates,
+      });
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao processar message.ack', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Handle message.sent event
+   * Confirma que mensagem foi enviada com sucesso
+   */
+  private async handleMessageSent(event: WahaWebhookEvent) {
+    try {
+      const payload = event.payload as MessageSentPayload;
+
+      this.logger.log('📤 Processando message.sent', {
+        session: event.session,
+        messageId: payload.id,
+        to: payload.to,
+      });
+
+      const phoneNumber = this.extractPhoneNumber(payload.to);
+      if (phoneNumber) {
+        // Atualizar MessageByContact
+        await this.messageByContactRepository.update(
+          { number: phoneNumber },
+          { send: 1 },
+        );
+
+        // Atualizar PublicByContact
+        await this.publicByContactRepository
+          .createQueryBuilder()
+          .update(PublicByContact)
+          .set({ send: 1, has_error: 0 })
+          .where('contact_id IN (SELECT id FROM contacts WHERE number = :phone)', {
+            phone: phoneNumber,
+          })
+          .execute();
+      }
+
+      this.logger.log('✅ message.sent processado', { phone: phoneNumber });
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao processar message.sent', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Handle session.status event
+   * Atualiza status de conexão do número WhatsApp
+   */
+  private async handleSessionStatus(event: WahaWebhookEvent) {
+    try {
+      const payload = event.payload as SessionStatusPayload;
+
+      this.logger.log('🔄 Processando session.status', {
+        session: event.session,
+        status: payload.status,
+      });
+
+      // Atualizar Number baseado no status
+      const statusConnection = payload.status === 'WORKING' ? 1 : 0;
+
+      await this.numberRepository.update(
+        { instance: event.session },
+        {
+          status_connection: statusConnection,
+          cel: payload.me?.id || null,
+        },
+      );
+
+      this.logger.log('✅ session.status processado', {
+        session: event.session,
+        connected: statusConnection === 1,
+      });
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao processar session.status', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Extract phone number from WAHA format
+   * WAHA format: "5511999999999@c.us" -> "5511999999999"
+   */
+  private extractPhoneNumber(wahaPhone: string): string | null {
+    if (!wahaPhone) return null;
+
+    // Remove @c.us ou @g.us (group)
+    const cleaned = wahaPhone.replace(/@.*$/, '');
+
+    return cleaned;
   }
 }
