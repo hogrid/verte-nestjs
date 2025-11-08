@@ -13,6 +13,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { QueueModule } from './queue/queue.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ScheduleModule } from './schedule/schedule.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -53,9 +54,7 @@ import { ScheduleModule } from './schedule/schedule.module';
     QueueModule, // Redis + Bull Queue for async jobs
     WhatsappModule, // WhatsApp integration via WAHA API (15 endpoints)
     ScheduleModule, // Cron jobs for scheduled campaigns
-
-    // TODO: Add modules here as migration progresses
-    // PaymentsModule,
+    PaymentsModule, // Stripe payments (4 endpoints)
   ],
   controllers: [AppController],
   providers: [AppService],

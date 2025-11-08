@@ -11,7 +11,9 @@ import { ValidationExceptionFilter } from './common/filters/validation-exception
 import { BadRequestToValidationFilter } from './common/filters/bad-request-to-validation.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true, // Enable raw body for Stripe webhooks
+  });
 
   // Enable class-validator to use NestJS dependency injection
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
