@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { redisConfig, QUEUE_NAMES, bullDefaultJobOptions } from '../config/redis.config';
+import { WhatsappModule } from '../whatsapp/whatsapp.module';
 
 // Processors
 import { CampaignsProcessor } from './processors/campaigns.processor';
@@ -60,6 +61,8 @@ import { Public } from '../database/entities/public.entity';
       { name: QUEUE_NAMES.CUSTOM_PUBLIC },
       { name: QUEUE_NAMES.WHATSAPP_MESSAGE },
     ),
+    // WhatsApp module for WAHA service
+    WhatsappModule,
   ],
   providers: [
     CampaignsProcessor,

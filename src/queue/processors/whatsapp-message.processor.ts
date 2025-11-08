@@ -8,7 +8,7 @@ import { QUEUE_NAMES } from '../../config/redis.config';
 import { PublicByContact } from '../../database/entities/public-by-contact.entity';
 import { Campaign } from '../../database/entities/campaign.entity';
 import { getErrorStack, getErrorMessage } from '../queue.helpers';
-import axios from 'axios';
+import { WahaService } from '../../whatsapp/waha.service';
 
 interface WhatsappMessageJobData {
   campaignId: number;
@@ -46,8 +46,6 @@ interface WhatsappMessageJobData {
 @Processor(QUEUE_NAMES.WHATSAPP_MESSAGE)
 export class WhatsappMessageProcessor {
   private readonly logger = new Logger(WhatsappMessageProcessor.name);
-  private readonly wahaUrl: string;
-  private readonly wahaApiKey: string;
 
   constructor(
     @InjectRepository(PublicByContact)
@@ -56,10 +54,8 @@ export class WhatsappMessageProcessor {
     private readonly campaignRepository: Repository<Campaign>,
     @InjectQueue(QUEUE_NAMES.CAMPAIGNS)
     private readonly campaignsQueue: Queue,
-  ) {
-    this.wahaUrl = process.env.WAHA_URL || 'http://localhost:8080';
-    this.wahaApiKey = process.env.API_WHATSAPP_GLOBALKEY || '';
-  }
+    private readonly wahaService: WahaService,
+  ) {}
 
   /**
    * Send campaign messages to a contact
@@ -134,6 +130,7 @@ export class WhatsappMessageProcessor {
 
   /**
    * Send a single message via WAHA API
+   * Uses WahaService for actual sending
    */
   private async sendMessage(
     sessionName: string,
@@ -147,116 +144,44 @@ export class WhatsappMessageProcessor {
   ): Promise<void> {
     try {
       const messageType = message.type || 'text';
+      const messageText = message.message || '';
+      const mediaUrl = message.media || '';
 
       switch (messageType) {
         case 'text':
-          await this.sendTextMessage(sessionName, phone, message.message || '');
+        case '1': // Laravel usa número como tipo
+          await this.wahaService.sendText(sessionName, phone, messageText);
           break;
 
         case 'image':
-          await this.sendMediaMessage(sessionName, phone, message.media || '', message.message, 'image');
+        case '2':
+          await this.wahaService.sendImage(sessionName, phone, mediaUrl, messageText);
           break;
 
         case 'video':
-          await this.sendMediaMessage(sessionName, phone, message.media || '', message.message, 'video');
+        case '4':
+          await this.wahaService.sendVideo(sessionName, phone, mediaUrl, messageText);
           break;
 
         case 'audio':
-          await this.sendMediaMessage(sessionName, phone, message.media || '', message.message, 'audio');
+        case '3':
+          await this.wahaService.sendAudio(sessionName, phone, mediaUrl);
           break;
 
         case 'document':
-          await this.sendMediaMessage(sessionName, phone, message.media || '', message.message, 'document');
+          await this.wahaService.sendImage(sessionName, phone, mediaUrl, messageText);
           break;
 
         default:
           // Default to text
-          await this.sendTextMessage(sessionName, phone, message.message || '');
+          await this.wahaService.sendText(sessionName, phone, messageText);
       }
+
+      this.logger.log(`✅ Mensagem ${messageType} enviada via WahaService`);
     } catch (error) {
       this.logger.error(`❌ Erro WAHA API: ${getErrorMessage(error)}`);
       throw error;
     }
-  }
-
-  /**
-   * Send text message via WAHA
-   */
-  private async sendTextMessage(sessionName: string, phone: string, text: string): Promise<void> {
-    const url = `${this.wahaUrl}/api/sendText`;
-
-    const response = await axios.post(
-      url,
-      {
-        session: sessionName,
-        chatId: phone,
-        text: text,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Api-Key': this.wahaApiKey,
-        },
-        timeout: 30000, // 30 segundos
-      },
-    );
-
-    if (response.status !== 200 && response.status !== 201) {
-      throw new Error(`WAHA API retornou status ${response.status}`);
-    }
-
-    this.logger.debug(`WAHA response:`, response.data);
-  }
-
-  /**
-   * Send media message (image, video, audio, document) via WAHA
-   */
-  private async sendMediaMessage(
-    sessionName: string,
-    phone: string,
-    mediaUrl: string,
-    caption: string | null,
-    mediaType: string,
-  ): Promise<void> {
-    const url = `${this.wahaUrl}/api/sendFile`;
-
-    const payload: any = {
-      session: sessionName,
-      chatId: phone,
-      file: {
-        url: mediaUrl,
-      },
-    };
-
-    // Adicionar caption se existir
-    if (caption) {
-      payload.file.caption = caption;
-    }
-
-    // Adicionar mimetype baseado no tipo
-    if (mediaType === 'image') {
-      payload.file.mimetype = 'image/jpeg';
-    } else if (mediaType === 'video') {
-      payload.file.mimetype = 'video/mp4';
-    } else if (mediaType === 'audio') {
-      payload.file.mimetype = 'audio/mpeg';
-    } else if (mediaType === 'document') {
-      payload.file.mimetype = 'application/pdf';
-    }
-
-    const response = await axios.post(url, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Api-Key': this.wahaApiKey,
-      },
-      timeout: 60000, // 60 segundos (arquivos podem ser grandes)
-    });
-
-    if (response.status !== 200 && response.status !== 201) {
-      throw new Error(`WAHA API retornou status ${response.status}`);
-    }
-
-    this.logger.debug(`WAHA media response:`, response.data);
   }
 
   /**
