@@ -21,6 +21,8 @@ import { AdminModule } from './admin/admin.module';
 import { UtilitiesModule } from './utilities/utilities.module';
 import { NumbersModule } from './numbers/numbers.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { UserProfileModule } from './user-profile/user-profile.module';
+import { ExtractorModule } from './extractor/extractor.module';
 
 @Module({
   imports: [
@@ -69,6 +71,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
     UtilitiesModule, // Utilities: health, recovery, debug, sync (19 endpoints)
     NumbersModule, // WhatsApp numbers CRUD (6 endpoints)
     DashboardModule, // User dashboard (2 endpoints)
+    UserProfileModule, // User profile endpoints (2 endpoints)
+    ExtractorModule, // Extractor config & Logs (3 endpoints)
   ],
   controllers: [AppController],
   providers: [AppService],
