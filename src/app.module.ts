@@ -23,6 +23,7 @@ import { NumbersModule } from './numbers/numbers.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { UserProfileModule } from './user-profile/user-profile.module';
 import { ExtractorModule } from './extractor/extractor.module';
+import { RemainingModule } from './remaining/remaining.module';
 
 @Module({
   imports: [
@@ -73,6 +74,7 @@ import { ExtractorModule } from './extractor/extractor.module';
     DashboardModule, // User dashboard (2 endpoints)
     UserProfileModule, // User profile endpoints (2 endpoints)
     ExtractorModule, // Extractor config & Logs (3 endpoints)
+    RemainingModule, // Final endpoints: integrations, webhooks, CORS, tests (18 endpoints)
   ],
   controllers: [AppController],
   providers: [AppService],
