@@ -458,4 +458,33 @@ export class PlansController {
   async delete(@Param('id', ParseIntPipe) id: number) {
     return this.plansService.delete(id);
   }
+
+  /**
+   * POST /api/v1/config/plans/cancel
+   * Cancel user's current plan
+   * Protected endpoint (requires user authentication)
+   */
+  @Post('cancel')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancelar assinatura do usuário',
+    description: 'Cancela o plano atual do usuário autenticado',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Assinatura cancelada com sucesso',
+    schema: {
+      example: {
+        success: true,
+        message: 'Assinatura cancelada com sucesso.',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Não autenticado' })
+  @ApiResponse({ status: 404, description: 'Usuário sem plano ativo' })
+  async cancelSubscription(@Query('user_id') userId: number) {
+    return this.plansService.cancelSubscription(userId);
+  }
 }

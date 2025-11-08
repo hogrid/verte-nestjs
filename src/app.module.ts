@@ -19,6 +19,8 @@ import { TemplatesModule } from './templates/templates.module';
 import { ExportModule } from './export/export.module';
 import { AdminModule } from './admin/admin.module';
 import { UtilitiesModule } from './utilities/utilities.module';
+import { NumbersModule } from './numbers/numbers.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -65,6 +67,8 @@ import { UtilitiesModule } from './utilities/utilities.module';
     ExportModule, // Export contacts/reports to CSV (2 endpoints)
     AdminModule, // Admin endpoints (11 endpoints - requires administrator profile)
     UtilitiesModule, // Utilities: health, recovery, debug, sync (19 endpoints)
+    NumbersModule, // WhatsApp numbers CRUD (6 endpoints)
+    DashboardModule, // User dashboard (2 endpoints)
   ],
   controllers: [AppController],
   providers: [AppService],
