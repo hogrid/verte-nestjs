@@ -15,6 +15,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { PaymentsModule } from './payments/payments.module';
 import { FilesModule } from './files/files.module';
+import { TemplatesModule } from './templates/templates.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { FilesModule } from './files/files.module';
     ScheduleModule, // Cron jobs for scheduled campaigns
     PaymentsModule, // Stripe payments (4 endpoints)
     FilesModule, // File upload/download (3 endpoints)
+    TemplatesModule, // Message templates with variables (4 endpoints)
   ],
   controllers: [AppController],
   providers: [AppService],
