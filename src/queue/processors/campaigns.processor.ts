@@ -1,7 +1,7 @@
 import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual, IsNull } from 'typeorm';
+import { Repository, LessThanOrEqual } from 'typeorm';
 import type { Job, Queue } from 'bull';
 import { QUEUE_NAMES } from '../../config/redis.config';
 import { Campaign } from '../../database/entities/campaign.entity';
@@ -9,6 +9,7 @@ import { PublicByContact } from '../../database/entities/public-by-contact.entit
 import { Number } from '../../database/entities/number.entity';
 import { Message } from '../../database/entities/message.entity';
 import { InjectQueue } from '@nestjs/bull';
+import { getErrorStack } from '../queue.helpers';
 
 /**
  * CampaignsProcessor
@@ -72,7 +73,7 @@ export class CampaignsProcessor {
 
       this.logger.log('✅ Processamento de campanhas agendadas concluído');
     } catch (error) {
-      this.logger.error('❌ Erro ao processar campanhas agendadas', error.stack);
+      this.logger.error('❌ Erro ao processar campanhas agendadas', getErrorStack(error));
       throw error;
     }
   }
@@ -102,7 +103,7 @@ export class CampaignsProcessor {
 
       this.logger.log(`✅ Campanha #${campaignId} processada com sucesso`);
     } catch (error) {
-      this.logger.error(`❌ Erro ao processar campanha #${campaignId}`, error.stack);
+      this.logger.error(`❌ Erro ao processar campanha #${campaignId}`, getErrorStack(error));
       throw error;
     }
   }
@@ -130,13 +131,19 @@ export class CampaignsProcessor {
       return;
     }
 
-    if (!number.connected || number.connected !== 1) {
+    if (!number.status_connection || number.status_connection !== 1) {
       this.logger.error(`❌ Número #${number.id} não está conectado`);
       await this.markCampaignAsFailed(campaign, 'Número WhatsApp não está conectado');
       return;
     }
 
     // 2. Buscar contatos do público
+    if (!campaign.public_id) {
+      this.logger.error(`❌ Campanha #${campaign.id} não tem público definido`);
+      await this.markCampaignAsFailed(campaign, 'Campanha sem público definido');
+      return;
+    }
+
     const contacts = await this.publicByContactRepository.find({
       where: {
         public_id: campaign.public_id,
@@ -182,7 +189,7 @@ export class CampaignsProcessor {
           contactId: publicByContact.contact_id,
           publicByContactId: publicByContact.id,
           numberId: campaign.number_id,
-          sessionName: number.waha_session,
+          sessionName: number.instance, // WAHA session name
           messages: messages.map((msg) => ({
             id: msg.id,
             type: msg.type,
@@ -191,7 +198,7 @@ export class CampaignsProcessor {
             media_type: msg.media_type,
             order: msg.order,
           })),
-          phone: publicByContact.contact.phone,
+          phone: publicByContact.contact.number, // Número do contato
         }, {
           attempts: 3,
           backoff: {
@@ -204,7 +211,7 @@ export class CampaignsProcessor {
 
         jobsCreated++;
       } catch (error) {
-        this.logger.error(`❌ Erro ao criar job para contato #${publicByContact.contact_id}`, error.stack);
+        this.logger.error(`❌ Erro ao criar job para contato #${publicByContact.contact_id}`, getErrorStack(error));
       }
     }
 
@@ -266,8 +273,9 @@ export class CampaignsProcessor {
 
       const processedContacts = (campaign.processed_contacts || 0) + 1;
       const totalSent = contactSent ? (campaign.total_sent || 0) + 1 : campaign.total_sent || 0;
-      const progress = campaign.total_contacts > 0
-        ? Math.round((processedContacts / campaign.total_contacts) * 100)
+      const totalContacts = campaign.total_contacts || 0;
+      const progress = totalContacts > 0
+        ? Math.round((processedContacts / totalContacts) * 100)
         : 0;
 
       // Atualizar campanha
@@ -278,18 +286,18 @@ export class CampaignsProcessor {
       });
 
       // Se todos os contatos foram processados, marcar como concluída
-      if (processedContacts >= campaign.total_contacts) {
+      if (processedContacts >= totalContacts && totalContacts > 0) {
         await this.campaignRepository.update(campaignId, {
           status: 2, // Concluída
           date_finished: new Date(),
         });
 
-        this.logger.log(`🎉 Campanha #${campaignId} concluída! ${totalSent}/${campaign.total_contacts} enviadas`);
+        this.logger.log(`🎉 Campanha #${campaignId} concluída! ${totalSent}/${totalContacts} enviadas`);
       } else {
-        this.logger.log(`📊 Campanha #${campaignId}: ${processedContacts}/${campaign.total_contacts} processados (${progress}%)`);
+        this.logger.log(`📊 Campanha #${campaignId}: ${processedContacts}/${totalContacts} processados (${progress}%)`);
       }
     } catch (error) {
-      this.logger.error(`❌ Erro ao atualizar progresso da campanha #${campaignId}`, error.stack);
+      this.logger.error(`❌ Erro ao atualizar progresso da campanha #${campaignId}`, getErrorStack(error));
       throw error;
     }
   }

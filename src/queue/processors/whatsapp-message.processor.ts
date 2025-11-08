@@ -3,10 +3,11 @@ import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
-import { Job, Queue } from 'bull';
+import type { Job, Queue } from 'bull';
 import { QUEUE_NAMES } from '../../config/redis.config';
 import { PublicByContact } from '../../database/entities/public-by-contact.entity';
 import { Campaign } from '../../database/entities/campaign.entity';
+import { getErrorStack, getErrorMessage } from '../queue.helpers';
 import axios from 'axios';
 
 interface WhatsappMessageJobData {
@@ -17,11 +18,11 @@ interface WhatsappMessageJobData {
   sessionName: string;
   messages: Array<{
     id: number;
-    type: string;
-    message: string;
+    type: string | null;
+    message: string | null;
     media: string | null;
     media_type: string | null;
-    order: number;
+    order: number | null;
   }>;
   phone: string;
 }
@@ -74,7 +75,7 @@ export class WhatsappMessageProcessor {
 
     try {
       // Ordenar mensagens por order
-      const sortedMessages = messages.sort((a, b) => a.order - b.order);
+      const sortedMessages = messages.sort((a, b) => (a.order || 0) - (b.order || 0));
 
       // Enviar cada mensagem
       for (const message of sortedMessages) {
@@ -86,9 +87,9 @@ export class WhatsappMessageProcessor {
           const delay = 1000 + Math.random() * 2000;
           await this.sleep(delay);
         } catch (error) {
-          this.logger.error(`❌ Erro ao enviar mensagem ${message.order} para ${phone}`, error.stack);
+          this.logger.error(`❌ Erro ao enviar mensagem ${message.order} para ${phone}`, getErrorStack(error));
           allMessagesSent = false;
-          errorMessage = error.message || 'Erro desconhecido ao enviar mensagem';
+          errorMessage = getErrorMessage(error);
           break; // Para no primeiro erro
         }
       }
@@ -112,7 +113,7 @@ export class WhatsappMessageProcessor {
         this.logger.warn(`⚠️ Falha no envio de mensagens para ${phone}: ${errorMessage}`);
       }
     } catch (error) {
-      this.logger.error(`❌ Erro geral ao processar envio para ${phone}`, error.stack);
+      this.logger.error(`❌ Erro geral ao processar envio para ${phone}`, getErrorStack(error));
 
       // Atualizar como erro
       await this.publicByContactRepository.update(publicByContactId, {
@@ -138,42 +139,42 @@ export class WhatsappMessageProcessor {
     sessionName: string,
     phone: string,
     message: {
-      type: string;
-      message: string;
+      type: string | null;
+      message: string | null;
       media: string | null;
       media_type: string | null;
     },
   ): Promise<void> {
-    const endpoint = `${this.wahaUrl}/api/sendText`;
-
     try {
-      switch (message.type) {
+      const messageType = message.type || 'text';
+
+      switch (messageType) {
         case 'text':
-          await this.sendTextMessage(sessionName, phone, message.message);
+          await this.sendTextMessage(sessionName, phone, message.message || '');
           break;
 
         case 'image':
-          await this.sendMediaMessage(sessionName, phone, message.media, message.message, 'image');
+          await this.sendMediaMessage(sessionName, phone, message.media || '', message.message, 'image');
           break;
 
         case 'video':
-          await this.sendMediaMessage(sessionName, phone, message.media, message.message, 'video');
+          await this.sendMediaMessage(sessionName, phone, message.media || '', message.message, 'video');
           break;
 
         case 'audio':
-          await this.sendMediaMessage(sessionName, phone, message.media, message.message, 'audio');
+          await this.sendMediaMessage(sessionName, phone, message.media || '', message.message, 'audio');
           break;
 
         case 'document':
-          await this.sendMediaMessage(sessionName, phone, message.media, message.message, 'document');
+          await this.sendMediaMessage(sessionName, phone, message.media || '', message.message, 'document');
           break;
 
         default:
           // Default to text
-          await this.sendTextMessage(sessionName, phone, message.message);
+          await this.sendTextMessage(sessionName, phone, message.message || '');
       }
     } catch (error) {
-      this.logger.error(`❌ Erro WAHA API: ${error.message}`);
+      this.logger.error(`❌ Erro WAHA API: ${getErrorMessage(error)}`);
       throw error;
     }
   }

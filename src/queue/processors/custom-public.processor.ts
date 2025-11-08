@@ -2,12 +2,13 @@ import { Process, Processor } from '@nestjs/bull';
 import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Job } from 'bull';
+import type { Job } from 'bull';
 import { QUEUE_NAMES } from '../../config/redis.config';
 import { CustomPublic } from '../../database/entities/custom-public.entity';
 import { PublicByContact } from '../../database/entities/public-by-contact.entity';
 import { Contact } from '../../database/entities/contact.entity';
 import { Public } from '../../database/entities/public.entity';
+import { getErrorStack } from '../queue.helpers';
 import * as xlsx from 'xlsx';
 import * as fs from 'fs';
 
@@ -125,9 +126,9 @@ export class CustomPublicProcessor {
         }
         phonesSeen.add(phone);
 
-        // Verificar se contato já existe
+        // Verificar se contato já existe (usando campo 'number' ao invés de 'phone')
         let contact = await this.contactRepository.findOne({
-          where: { user_id: userId, phone },
+          where: { user_id: userId, number: phone },
         });
 
         if (!contact) {
@@ -135,14 +136,14 @@ export class CustomPublicProcessor {
           contact = this.contactRepository.create({
             user_id: userId,
             name: name || phone,
-            phone,
-            active: 1,
+            number: phone, // Campo correto é 'number'
+            status: 1, // Ativo
           });
 
           contact = await this.contactRepository.save(contact);
           this.logger.log(`✅ Contato criado: ${contact.name} (${phone})`);
         } else {
-          this.logger.log(`♻️ Contato já existe: ${contact.name} (${phone})`);
+          this.logger.log(`♻️ Contato já existe: ${contact.name || 'Sem nome'} (${phone})`);
         }
 
         contacts.push(contact);
@@ -159,8 +160,7 @@ export class CustomPublicProcessor {
       const publicData = this.publicRepository.create({
         user_id: userId,
         name: `Público Customizado - Campanha #${campaignId}`,
-        is_random: 0,
-        active: 1,
+        status: 1,
       });
 
       const savedPublic = await this.publicRepository.save(publicData);
@@ -195,9 +195,9 @@ export class CustomPublicProcessor {
         this.logger.log(`✅ Criados ${publicByContactsData.length} registros em PublicByContact`);
       }
 
-      // 7. Atualizar CustomPublic com public_id
+      // 7. Atualizar CustomPublic status (public_id não existe na entity)
       await this.customPublicRepository.update(customPublicId, {
-        public_id: savedPublic.id,
+        status: 1, // Processado
       });
 
       // 8. Remover arquivo temporário
@@ -205,7 +205,8 @@ export class CustomPublicProcessor {
         fs.unlinkSync(filePath);
         this.logger.log(`🗑️ Arquivo temporário removido: ${filePath}`);
       } catch (err) {
-        this.logger.warn(`⚠️ Erro ao remover arquivo temporário: ${err.message}`);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`⚠️ Erro ao remover arquivo temporário: ${errorMessage}`);
       }
 
       // 9. Retornar dados para o callback
@@ -214,7 +215,7 @@ export class CustomPublicProcessor {
         totalContacts: contacts.length,
       };
     } catch (error) {
-      this.logger.error(`❌ Erro ao processar público customizado #${customPublicId}`, error.stack);
+      this.logger.error(`❌ Erro ao processar público customizado #${customPublicId}`, getErrorStack(error));
       throw error;
     }
   }
