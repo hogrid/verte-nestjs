@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
+import { QueueModule } from '../queue/queue.module';
 
 // Campaign entities
 import { Campaign } from '../database/entities/campaign.entity';
@@ -42,6 +43,7 @@ import { User } from '../database/entities/user.entity';
       Plan,
       User,
     ]),
+    QueueModule, // Import QueueModule to enable queue injection in CampaignsService
   ],
   controllers: [CampaignsController],
   providers: [CampaignsService],

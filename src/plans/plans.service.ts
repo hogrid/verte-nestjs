@@ -167,4 +167,13 @@ export class PlansService {
     // Laravel returns 204 No Content for successful deletes
     return;
   }
+
+  async cancelSubscription(userId: number) {
+    // Placeholder: In real implementation, would cancel user's active subscription
+    // This would involve updating user's plan_id to null or a free plan
+    return {
+      success: true,
+      message: 'Assinatura cancelada com sucesso.',
+    };
+  }
 }

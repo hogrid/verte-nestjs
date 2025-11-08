@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets } from 'typeorm';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
 import { Campaign } from '../database/entities/campaign.entity';
 import { Number } from '../database/entities/number.entity';
 import { Contact } from '../database/entities/contact.entity';
@@ -23,6 +25,7 @@ import { UpdateSimplifiedPublicDto } from './dto/update-simplified-public.dto';
 import { CreateCustomPublicDto } from './dto/create-custom-public.dto';
 import { UpdateCustomPublicDto } from './dto/update-custom-public.dto';
 import { CreateLabelPublicDto } from './dto/create-label-public.dto';
+import { QUEUE_NAMES } from '../config/redis.config';
 
 /**
  * CampaignsService
@@ -52,6 +55,12 @@ export class CampaignsService {
     private readonly simplifiedPublicRepository: Repository<SimplifiedPublic>,
     @InjectRepository(CustomPublic)
     private readonly customPublicRepository: Repository<CustomPublic>,
+    @InjectQueue(QUEUE_NAMES.CAMPAIGNS)
+    private readonly campaignsQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.SIMPLIFIED_PUBLIC)
+    private readonly simplifiedPublicQueue: Queue,
+    @InjectQueue(QUEUE_NAMES.CUSTOM_PUBLIC)
+    private readonly customPublicQueue: Queue,
   ) {}
 
   /**
@@ -333,8 +342,43 @@ export class CampaignsService {
         this.logger.log('✅ Mensagem criada', { index, type: messageDto.type });
       }
 
-      // 8. TODO: Dispatch queue job (CampaignsJob) if status=0 and no schedule_date
-      // Will be implemented in FASE 5
+      // 8. Dispatch queue job if campaign is pending (status=0) and no schedule
+      if (status === 0 && !dto.schedule_date) {
+        this.logger.log('📤 Enfileirando job de disparo de campanha', {
+          campaign_id: savedCampaign.id,
+        });
+
+        await this.campaignsQueue.add('process-campaign', {
+          campaignId: savedCampaign.id,
+        }, {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+        });
+      } else if (status === 3 && scheduleDate) {
+        // Schedule job for future execution
+        const delay = scheduleDate.getTime() - Date.now();
+        if (delay > 0) {
+          this.logger.log('⏰ Agendando job de disparo de campanha', {
+            campaign_id: savedCampaign.id,
+            schedule_date: scheduleDate,
+            delay_ms: delay,
+          });
+
+          await this.campaignsQueue.add('process-campaign', {
+            campaignId: savedCampaign.id,
+          }, {
+            delay,
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 5000,
+            },
+          });
+        }
+      }
 
       this.logger.log('🎉 Campanha criada com sucesso', {
         campaign_id: savedCampaign.id,
@@ -558,7 +602,23 @@ export class CampaignsService {
 
       const saved = await this.simplifiedPublicRepository.save(simplified);
 
-      // TODO: Dispatch SimplifiedPublicJob (will be implemented in FASE 5)
+      // Dispatch SimplifiedPublicJob
+      this.logger.log('📤 Enfileirando job de processamento de público simplificado', {
+        simplified_public_id: saved.id,
+      });
+
+      await this.simplifiedPublicQueue.add('process-simplified-public', {
+        simplifiedPublicId: saved.id,
+        userId: saved.user_id,
+        numberId: saved.number_id,
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      });
+
       this.logger.log('✅ Público simplificado criado', { id: saved.id });
 
       return { data: saved };
@@ -654,9 +714,28 @@ export class CampaignsService {
         number_id: numberActive.id,
       });
 
-      await this.customPublicRepository.save(customPublic);
+      const saved = await this.customPublicRepository.save(customPublic);
 
-      // TODO: Dispatch CustomPublicJob (will be implemented in FASE 5)
+      // Dispatch CustomPublicJob to process XLSX file
+      this.logger.log('📤 Enfileirando job de processamento de público customizado', {
+        custom_public_id: saved.id,
+        file: filePath,
+      });
+
+      await this.customPublicQueue.add('process-custom-public', {
+        customPublicId: saved.id,
+        userId: saved.user_id,
+        campaignId: 0, // Will be set by campaign when created
+        filePath: saved.file,
+        numberNumber: numberActive.cel || '', // Country code (e.g., "55" for Brazil)
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      });
+
       this.logger.log('✅ Público customizado criado');
 
       return { data: true };
@@ -757,9 +836,26 @@ export class CampaignsService {
         label: JSON.stringify(dto.label),
       });
 
-      await this.simplifiedPublicRepository.save(simplified);
+      const saved = await this.simplifiedPublicRepository.save(simplified);
 
-      // TODO: Dispatch SimplifiedPublicJob (will be implemented in FASE 5)
+      // Dispatch SimplifiedPublicJob with labels
+      this.logger.log('📤 Enfileirando job de processamento de público por etiquetas', {
+        simplified_public_id: saved.id,
+        labels: dto.label,
+      });
+
+      await this.simplifiedPublicQueue.add('process-simplified-public', {
+        simplifiedPublicId: saved.id,
+        userId: saved.user_id,
+        numberId: saved.number_id,
+      }, {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      });
+
       this.logger.log('✅ Público por etiquetas criado');
 
       return { data: true };

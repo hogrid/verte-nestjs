@@ -10,6 +10,20 @@ import { ContactsModule } from './contacts/contacts.module';
 import { LabelsModule } from './labels/labels.module';
 import { PublicsModule } from './publics/publics.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { QueueModule } from './queue/queue.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { ScheduleModule } from './schedule/schedule.module';
+import { PaymentsModule } from './payments/payments.module';
+import { FilesModule } from './files/files.module';
+import { TemplatesModule } from './templates/templates.module';
+import { ExportModule } from './export/export.module';
+import { AdminModule } from './admin/admin.module';
+import { UtilitiesModule } from './utilities/utilities.module';
+import { NumbersModule } from './numbers/numbers.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { UserProfileModule } from './user-profile/user-profile.module';
+import { ExtractorModule } from './extractor/extractor.module';
+import { RemainingModule } from './remaining/remaining.module';
 
 @Module({
   imports: [
@@ -47,10 +61,20 @@ import { CampaignsModule } from './campaigns/campaigns.module';
     LabelsModule,
     PublicsModule,
     CampaignsModule,
-
-    // TODO: Add modules here as migration progresses
-    // WhatsappModule,
-    // PaymentsModule,
+    QueueModule, // Redis + Bull Queue for async jobs
+    WhatsappModule, // WhatsApp integration via WAHA API (15 endpoints)
+    ScheduleModule, // Cron jobs for scheduled campaigns
+    PaymentsModule, // Stripe payments (4 endpoints)
+    FilesModule, // File upload/download (3 endpoints)
+    TemplatesModule, // Message templates with variables (4 endpoints)
+    ExportModule, // Export contacts/reports to CSV (2 endpoints)
+    AdminModule, // Admin endpoints (11 endpoints - requires administrator profile)
+    UtilitiesModule, // Utilities: health, recovery, debug, sync (19 endpoints)
+    NumbersModule, // WhatsApp numbers CRUD (6 endpoints)
+    DashboardModule, // User dashboard (2 endpoints)
+    UserProfileModule, // User profile endpoints (2 endpoints)
+    ExtractorModule, // Extractor config & Logs (3 endpoints)
+    RemainingModule, // Final endpoints: integrations, webhooks, CORS, tests (18 endpoints)
   ],
   controllers: [AppController],
   providers: [AppService],
