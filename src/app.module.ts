@@ -11,6 +11,7 @@ import { LabelsModule } from './labels/labels.module';
 import { PublicsModule } from './publics/publics.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { QueueModule } from './queue/queue.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -49,9 +50,9 @@ import { QueueModule } from './queue/queue.module';
     PublicsModule,
     CampaignsModule,
     QueueModule, // Redis + Bull Queue for async jobs
+    WhatsappModule, // WhatsApp integration via WAHA API (15 endpoints)
 
     // TODO: Add modules here as migration progresses
-    // WhatsappModule,
     // PaymentsModule,
   ],
   controllers: [AppController],
