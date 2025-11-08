@@ -14,6 +14,7 @@ import { QueueModule } from './queue/queue.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { PaymentsModule } from './payments/payments.module';
+import { FilesModule } from './files/files.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { PaymentsModule } from './payments/payments.module';
     WhatsappModule, // WhatsApp integration via WAHA API (15 endpoints)
     ScheduleModule, // Cron jobs for scheduled campaigns
     PaymentsModule, // Stripe payments (4 endpoints)
+    FilesModule, // File upload/download (3 endpoints)
   ],
   controllers: [AppController],
   providers: [AppService],
