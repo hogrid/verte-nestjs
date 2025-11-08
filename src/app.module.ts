@@ -10,6 +10,7 @@ import { ContactsModule } from './contacts/contacts.module';
 import { LabelsModule } from './labels/labels.module';
 import { PublicsModule } from './publics/publics.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
     LabelsModule,
     PublicsModule,
     CampaignsModule,
+    QueueModule, // Redis + Bull Queue for async jobs
 
     // TODO: Add modules here as migration progresses
     // WhatsappModule,
