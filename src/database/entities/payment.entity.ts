@@ -13,8 +13,12 @@ import { Plan } from './plan.entity';
 
 /**
  * Payment Entity
- * Maps to existing Laravel 'payments' table (se existir) ou cria nova
- * Registra transações de pagamento (Stripe)
+ * Mapeia para a tabela 'payments' existente do Laravel
+ * Registra transações de pagamento (Stripe, MercadoPago)
+ *
+ * IMPORTANTE: A coluna deleted_at JÁ EXISTE no banco de dados Laravel original.
+ * Ver docs/migration/database-schema.md linha 513 para schema completo.
+ * NUNCA modifique a estrutura da tabela - use o schema existente.
  */
 @Entity('payments')
 export class Payment {

@@ -13,9 +13,12 @@ import { Number } from './number.entity';
 
 /**
  * CustomPublic Entity
- * Maps to existing Laravel 'custom_publics' table
- * Represents custom campaign publics with file uploads
- * NEVER modify table structure - use existing schema
+ * Mapeia para a tabela 'custom_publics' existente do Laravel
+ * Representa públicos customizados de campanha com upload de arquivos
+ *
+ * IMPORTANTE: A coluna deleted_at JÁ EXISTE no banco de dados Laravel original.
+ * Ver docs/migration/database-schema.md linha 682 para schema completo.
+ * NUNCA modifique a estrutura da tabela - use o schema existente.
  */
 @Entity('custom_publics')
 export class CustomPublic {
