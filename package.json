@@ -17,7 +17,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:e2e": "NODE_ENV=test MOCK_STRIPE=1 MOCK_BULL=1 ALLOW_TEST_TABLE_SETUP=1 jest --config ./test/jest-e2e.json --runInBand --forceExit",
     "typecheck": "tsc --noEmit",
     "typecheck:watch": "tsc --noEmit --watch",
     "validate": "npm run typecheck && npm run lint && npm run build",
