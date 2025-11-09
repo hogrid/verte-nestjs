@@ -9,9 +9,12 @@ import {
 
 /**
  * Setting Entity
- * Maps to existing Laravel 'settings' table
+ * Mapeia para a tabela 'settings' existente do Laravel
  * Armazena configurações globais do sistema (key-value)
- * NEVER modify table structure - use existing schema
+ *
+ * IMPORTANTE: A coluna deleted_at JÁ EXISTE no banco de dados Laravel original.
+ * Ver docs/migration/database-schema.md linha 624 para schema completo.
+ * NUNCA modifique a estrutura da tabela - use o schema existente.
  */
 @Entity('settings')
 export class Setting {

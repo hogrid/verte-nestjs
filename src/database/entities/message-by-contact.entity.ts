@@ -9,9 +9,12 @@ import {
 
 /**
  * MessageByContact Entity
- * Maps to existing Laravel 'message_by_contacts' table
- * Tracks message status per contact
- * NEVER modify table structure - use existing schema
+ * Mapeia para a tabela 'message_by_contacts' existente do Laravel
+ * Rastreia status de mensagens por contato
+ *
+ * IMPORTANTE: A coluna deleted_at JÁ EXISTE no banco de dados Laravel original.
+ * Ver docs/migration/database-schema.md linha 689 para schema completo.
+ * NUNCA modifique a estrutura da tabela - use o schema existente.
  */
 @Entity('message_by_contacts')
 export class MessageByContact {

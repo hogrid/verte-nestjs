@@ -13,9 +13,12 @@ import { Campaign } from './campaign.entity';
 
 /**
  * Message Entity
- * Maps to existing Laravel 'messages' table
- * Represents messages within a campaign
- * NEVER modify table structure - use existing schema
+ * Mapeia para a tabela 'messages' existente do Laravel
+ * Representa mensagens dentro de uma campanha
+ *
+ * IMPORTANTE: A coluna deleted_at JÁ EXISTE no banco de dados Laravel original.
+ * Ver docs/migration/database-schema.md linha 366 para schema completo.
+ * NUNCA modifique a estrutura da tabela - use o schema existente.
  */
 @Entity('messages')
 export class Message {

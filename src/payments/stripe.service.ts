@@ -20,9 +20,10 @@ export class StripeService {
       this.logger.warn('⚠️ STRIPE_SECRET_KEY não configurada');
     }
 
-    // Use latest API version supported by installed Stripe SDK
+    // Use latest API version supported by installed Stripe SDK (v19.3.0+)
+    // '2025-10-29.clover' is officially supported by stripe@19.3.0
     this.stripe = new Stripe(stripeSecretKey || '', {
-      apiVersion: '2025-10-29.clover' as any, // Latest version
+      apiVersion: '2025-10-29.clover',
     });
   }
 
