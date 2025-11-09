@@ -72,12 +72,13 @@ describe('Payments Module (e2e) - Laravel Compatibility Tests', () => {
     if (!plan) {
       plan = planRepository.create({
         name: 'Plano Teste Payment',
-        description: 'Plano para testes de pagamento',
         value: 99.9,
-        days_recurrency: 30,
-        contacts_limit: 1000,
-        instances_limit: 3,
-        days_test: 7,
+        value_promotion: 79.9,
+        unlimited: 0,
+        medias: 1,
+        reports: 1,
+        schedule: 1,
+        popular: 0,
       });
       plan = await planRepository.save(plan);
     }

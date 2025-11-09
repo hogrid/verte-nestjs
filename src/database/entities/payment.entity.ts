@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -55,6 +56,9 @@ export class Payment {
 
   @UpdateDateColumn()
   updated_at: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at' })
+  deleted_at: Date | null;
 
   // Relationships
   @ManyToOne(() => User)

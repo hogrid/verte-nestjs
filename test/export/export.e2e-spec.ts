@@ -132,7 +132,6 @@ describe('Export Module (e2e) - Laravel Compatibility Tests', () => {
       user_id: testUser.id,
       number_id: 1,
       name: 'Campanha Teste Export',
-      description: 'Teste',
       status: 0,
       total_contacts: 100,
       progress: 0,

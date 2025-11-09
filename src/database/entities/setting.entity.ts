@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 
 /**
@@ -31,4 +32,7 @@ export class Setting {
 
   @UpdateDateColumn({ type: 'timestamp' })
   updated_at: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at' })
+  deleted_at: Date | null;
 }
