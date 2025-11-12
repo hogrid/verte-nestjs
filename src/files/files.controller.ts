@@ -50,6 +50,7 @@ export class FilesController {
   @Post('upload-media')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -109,8 +110,7 @@ export class FilesController {
   })
   @ApiOperation({
     summary: 'Upload de arquivo de mídia',
-    description:
-      'Faz upload de imagem, vídeo, áudio ou PDF (máx 50MB)',
+    description: 'Faz upload de imagem, vídeo, áudio ou PDF (máx 50MB)',
   })
   @ApiResponse({
     status: 200,
@@ -132,7 +132,7 @@ export class FilesController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
-      throw new BadRequestException('Nenhum arquivo foi enviado');
+      throw new BadRequestException('É obrigatório enviar um arquivo.');
     }
 
     return this.filesService.uploadMedia(req.user.id, file);
@@ -166,6 +166,10 @@ export class FilesController {
   @ApiResponse({ status: 404, description: 'Arquivo não encontrado' })
   async downloadFile(@Param('id') id: string, @Res() res: Response) {
     const fileData = await this.filesService.downloadFile(id);
+    // Debug log: filename-based download
+    // Using Nest logger is avoided here to keep noise low in prod; acceptable in test.
+    // eslint-disable-next-line no-console
+    console.log('[FilesController] downloadFile', { id, fileData });
 
     res.setHeader('Content-Type', fileData.mimetype);
     res.setHeader(
@@ -173,6 +177,7 @@ export class FilesController {
       `inline; filename="${fileData.filename}"`,
     );
 
+    // Garantir caminho absoluto para envio
     return res.sendFile(fileData.path);
   }
 

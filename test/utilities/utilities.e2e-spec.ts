@@ -55,6 +55,10 @@ describe('Utilities Module (e2e) - Laravel Compatibility Tests', () => {
 
   afterAll(async () => {
     if (testUser) {
+      // Delete configurations first (foreign key constraint)
+      const configRepository = dataSource.getRepository('configurations');
+      await configRepository.delete({ user_id: testUser.id });
+
       const numberRepository = dataSource.getRepository('numbers');
       await numberRepository.delete({ user_id: testUser.id });
 

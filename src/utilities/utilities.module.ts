@@ -15,9 +15,7 @@ import { UtilitiesService } from './utilities.service';
  * Total: 19 endpoints
  */
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Campaign, Contact, Configuration]),
-  ],
+  imports: [TypeOrmModule.forFeature([Campaign, Contact, Configuration])],
   controllers: [UtilitiesController],
   providers: [UtilitiesService],
   exports: [UtilitiesService],

@@ -28,7 +28,10 @@ export class ExportService {
    * Exportar contatos para CSV
    * Retorna CSV com UTF-8 BOM para Excel
    */
-  async exportContactsCsv(userId: number, dto: ExportContactsDto): Promise<string> {
+  async exportContactsCsv(
+    userId: number,
+    dto: ExportContactsDto,
+  ): Promise<string> {
     const query = this.contactRepository
       .createQueryBuilder('contact')
       .where('contact.user_id = :userId', { userId })
@@ -62,7 +65,15 @@ export class ExportService {
     const header = 'ID,Nome,Telefone,Responsável,Etiquetas,Status,Criado em\n';
     const rows = contacts
       .map((c) => {
-        const createdAt = c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : '';
+        // Format date as DD/MM/YYYY (Laravel format)
+        let createdAt = '';
+        if (c.created_at) {
+          const date = new Date(c.created_at);
+          const day = String(date.getDate()).padStart(2, '0');
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const year = date.getFullYear();
+          createdAt = `${day}/${month}/${year}`;
+        }
         const statusText = c.status === 1 ? 'Ativo' : 'Bloqueado';
         const labels = c.labels || '';
         return `${c.id},"${c.name || ''}","${c.number || ''}","${c.cel_owner || ''}","${labels}","${statusText}","${createdAt}"`;

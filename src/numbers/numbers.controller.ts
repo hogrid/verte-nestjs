@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Param,
   Body,
@@ -9,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,6 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { NumbersService } from './numbers.service';
+import { CreateNumberDto } from './dto/create-number.dto';
 import { UpdateNumberDto } from './dto/update-number.dto';
 
 /**
@@ -51,7 +54,27 @@ export class NumbersController {
   }
 
   /**
-   * 2. GET /api/v1/numbers/:number
+   * 2. POST /api/v1/numbers
+   * Criar novo número/instância WhatsApp
+   */
+  @Post('numbers')
+  @ApiOperation({
+    summary: 'Criar número WhatsApp',
+    description: 'Cria um novo número/instância WhatsApp',
+  })
+  @ApiBody({ type: CreateNumberDto })
+  @ApiResponse({ status: 201, description: 'Número criado' })
+  @ApiResponse({ status: 400, description: 'Dados inválidos' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  async create(
+    @Request() req: { user: { id: number } },
+    @Body() createDto: CreateNumberDto,
+  ) {
+    return this.numbersService.create(req.user.id, createDto);
+  }
+
+  /**
+   * 3. GET /api/v1/numbers/:number
    * Detalhes de número específico
    */
   @Get('numbers/:number')
@@ -65,16 +88,16 @@ export class NumbersController {
   @ApiResponse({ status: 404, description: 'Número não encontrado' })
   async findOne(
     @Request() req: { user: { id: number } },
-    @Param('number') numberId: number,
+    @Param('number', ParseIntPipe) numberId: number,
   ) {
     return this.numbersService.findOne(req.user.id, numberId);
   }
 
   /**
-   * 3. POST /api/v1/numbers/:number
+   * 4. PUT /api/v1/numbers/:number
    * Atualizar configurações do número
    */
-  @Post('numbers/:number')
+  @Put('numbers/:number')
   @ApiOperation({
     summary: 'Atualizar número',
     description: 'Atualiza configurações de um número/instância WhatsApp',
@@ -86,14 +109,35 @@ export class NumbersController {
   @ApiResponse({ status: 404, description: 'Número não encontrado' })
   async update(
     @Request() req: { user: { id: number } },
-    @Param('number') numberId: number,
+    @Param('number', ParseIntPipe) numberId: number,
     @Body() dto: UpdateNumberDto,
   ) {
     return this.numbersService.update(req.user.id, numberId, dto);
   }
 
   /**
-   * 4. DELETE /api/v1/numbers/:number
+   * 5. POST /api/v1/numbers/:number/reconnect
+   * Reconectar número WhatsApp
+   */
+  @Post('numbers/:number/reconnect')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Reconectar número',
+    description: 'Dispara reconexão do número/instância WhatsApp',
+  })
+  @ApiParam({ name: 'number', description: 'ID do número', example: 1 })
+  @ApiResponse({ status: 200, description: 'Reconexão iniciada' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Número não encontrado' })
+  async reconnect(
+    @Request() req: { user: { id: number } },
+    @Param('number', ParseIntPipe) numberId: number,
+  ) {
+    return this.numbersService.reconnect(req.user.id, numberId);
+  }
+
+  /**
+   * 6. DELETE /api/v1/numbers/:number
    * Deletar número WhatsApp
    */
   @Delete('numbers/:number')
@@ -108,13 +152,13 @@ export class NumbersController {
   @ApiResponse({ status: 404, description: 'Número não encontrado' })
   async delete(
     @Request() req: { user: { id: number } },
-    @Param('number') numberId: number,
+    @Param('number', ParseIntPipe) numberId: number,
   ) {
     return this.numbersService.delete(req.user.id, numberId);
   }
 
   /**
-   * 5. GET /api/v1/extra-number
+   * 7. GET /api/v1/extra-number
    * Listar números extras disponíveis
    */
   @Get('extra-number')
@@ -130,7 +174,8 @@ export class NumbersController {
         current_numbers: 1,
         max_numbers: 5,
         available: 4,
-        message: 'Você possui 1 número(s). Pode adicionar até 4 número(s) extra(s).',
+        message:
+          'Você possui 1 número(s). Pode adicionar até 4 número(s) extra(s).',
       },
     },
   })
@@ -140,7 +185,7 @@ export class NumbersController {
   }
 
   /**
-   * 6. POST /api/v1/extra-number
+   * 8. POST /api/v1/extra-number
    * Adicionar número extra
    */
   @Post('extra-number')
@@ -162,7 +207,10 @@ export class NumbersController {
     },
   })
   @ApiResponse({ status: 201, description: 'Número extra adicionado' })
-  @ApiResponse({ status: 400, description: 'Limite atingido ou número já existe' })
+  @ApiResponse({
+    status: 400,
+    description: 'Limite atingido ou número já existe',
+  })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   async addExtraNumber(
     @Request() req: { user: { id: number } },

@@ -18,7 +18,11 @@ export class RemainingService {
   }
 
   getExternalData(campaignId: number) {
-    return { campaign_id: campaignId, external_data: [], message: 'Sem dados externos' };
+    return {
+      campaign_id: campaignId,
+      external_data: [],
+      message: 'Sem dados externos',
+    };
   }
 
   triggerEvent(data: any) {
@@ -35,12 +39,16 @@ export class RemainingService {
       version: '1.0.0',
       endpoints: 121,
       documentation: '/api/docs',
-      message: 'API Verte NestJS - Migração 100% completa'
+      message: 'API Verte NestJS - Migração 100% completa',
     };
   }
 
   corsOptions() {
-    return { allowed: true, methods: ['GET', 'POST', 'PUT', 'DELETE'], origins: ['*'] };
+    return {
+      allowed: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      origins: ['*'],
+    };
   }
 
   // Test endpoints
@@ -54,7 +62,7 @@ export class RemainingService {
       endpoint,
       status: 'implemented',
       message: 'Endpoint implementado para compatibilidade com Laravel',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }

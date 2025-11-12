@@ -121,9 +121,7 @@ describe('Dashboard Module (e2e) - Laravel Compatibility Tests', () => {
     });
 
     it('should reject unauthenticated requests', async () => {
-      await request(app.getHttpServer())
-        .get('/api/v1/dashboard')
-        .expect(401);
+      await request(app.getHttpServer()).get('/api/v1/dashboard').expect(401);
     });
   });
 

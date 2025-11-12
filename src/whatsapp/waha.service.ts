@@ -161,13 +161,10 @@ export class WahaService {
     try {
       this.logger.log(`📤 Enviando mensagem de texto: ${session}`);
 
-      const response = await this.wahaClient.post(
-        `/api/${session}/sendText`,
-        {
-          chatId,
-          text,
-        },
-      );
+      const response = await this.wahaClient.post(`/api/${session}/sendText`, {
+        chatId,
+        text,
+      });
 
       return response.data;
     } catch (error: unknown) {
@@ -194,13 +191,10 @@ export class WahaService {
     try {
       this.logger.log(`📊 Enviando enquete: ${session}`);
 
-      const response = await this.wahaClient.post(
-        `/api/${session}/sendPoll`,
-        {
-          chatId,
-          poll,
-        },
-      );
+      const response = await this.wahaClient.post(`/api/${session}/sendPoll`, {
+        chatId,
+        poll,
+      });
 
       return response.data;
     } catch (error: unknown) {
@@ -268,14 +262,11 @@ export class WahaService {
     try {
       this.logger.log(`🖼️ Enviando imagem: ${session}`);
 
-      const response = await this.wahaClient.post(
-        `/api/${session}/sendImage`,
-        {
-          chatId,
-          file: { url: imageUrl },
-          caption,
-        },
-      );
+      const response = await this.wahaClient.post(`/api/${session}/sendImage`, {
+        chatId,
+        file: { url: imageUrl },
+        caption,
+      });
 
       return response.data;
     } catch (error: unknown) {
@@ -298,13 +289,10 @@ export class WahaService {
     try {
       this.logger.log(`🎵 Enviando áudio: ${session}`);
 
-      const response = await this.wahaClient.post(
-        `/api/${session}/sendAudio`,
-        {
-          chatId,
-          file: { url: audioUrl },
-        },
-      );
+      const response = await this.wahaClient.post(`/api/${session}/sendAudio`, {
+        chatId,
+        file: { url: audioUrl },
+      });
 
       return response.data;
     } catch (error: unknown) {
@@ -328,14 +316,11 @@ export class WahaService {
     try {
       this.logger.log(`🎬 Enviando vídeo: ${session}`);
 
-      const response = await this.wahaClient.post(
-        `/api/${session}/sendVideo`,
-        {
-          chatId,
-          file: { url: videoUrl },
-          caption,
-        },
-      );
+      const response = await this.wahaClient.post(`/api/${session}/sendVideo`, {
+        chatId,
+        file: { url: videoUrl },
+        caption,
+      });
 
       return response.data;
     } catch (error: unknown) {

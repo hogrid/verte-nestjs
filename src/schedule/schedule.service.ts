@@ -84,7 +84,9 @@ export class ScheduleService {
         return;
       }
 
-      this.logger.log(`📋 Encontradas ${scheduledCampaigns.length} campanha(s) para disparar`);
+      this.logger.log(
+        `📋 Encontradas ${scheduledCampaigns.length} campanha(s) para disparar`,
+      );
 
       // Enfileirar cada campanha para processamento
       let successCount = 0;
@@ -94,22 +96,33 @@ export class ScheduleService {
         try {
           // Verificar se não foi cancelada/pausada entre a query e agora
           if (campaign.canceled === 1 || campaign.paused === 1) {
-            this.logger.warn(`⚠️ Campanha #${campaign.id} foi cancelada/pausada, pulando`);
+            this.logger.warn(
+              `⚠️ Campanha #${campaign.id} foi cancelada/pausada, pulando`,
+            );
             continue;
           }
 
           // Enfileirar job de processamento
-          await this.campaignsQueue.add('process-campaign', {
-            campaignId: campaign.id,
-          }, {
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 5000,
+          await this.campaignsQueue.add(
+            'process-campaign',
+            {
+              campaignId: campaign.id,
             },
-          });
+            {
+              attempts: 3,
+              backoff: {
+                type: 'exponential',
+                delay: 5000,
+              },
+            },
+          );
 
-          this.logger.log(`✅ Campanha #${campaign.id} enfileirada (agendada para ${campaign.schedule_date})`);
+          const scheduleDateStr = campaign.schedule_date
+            ? campaign.schedule_date.toISOString()
+            : 'n/a';
+          this.logger.log(
+            `✅ Campanha #${campaign.id} enfileirada (agendada para ${scheduleDateStr})`,
+          );
           successCount++;
         } catch (error: unknown) {
           this.logger.error(`❌ Erro ao enfileirar campanha #${campaign.id}`, {
@@ -119,12 +132,17 @@ export class ScheduleService {
         }
       }
 
-      this.logger.log(`🎉 [CRON] Processamento concluído: ${successCount} enfileiradas, ${errorCount} erros`);
+      this.logger.log(
+        `🎉 [CRON] Processamento concluído: ${successCount} enfileiradas, ${errorCount} erros`,
+      );
     } catch (error: unknown) {
-      this.logger.error('❌ [CRON] Erro crítico ao processar campanhas agendadas', {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+      this.logger.error(
+        '❌ [CRON] Erro crítico ao processar campanhas agendadas',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+      );
     } finally {
       this.isProcessing = false;
     }

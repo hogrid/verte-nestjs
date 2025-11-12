@@ -285,10 +285,11 @@ describe('Admin Module (e2e) - Laravel Compatibility Tests', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(response.body).toHaveProperty('id');
-      expect(response.body).toHaveProperty('name');
-      expect(response.body).toHaveProperty('email');
-      expect(response.body).toHaveProperty('plan');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data).toHaveProperty('name');
+      expect(response.body.data).toHaveProperty('email');
+      expect(response.body.data).toHaveProperty('plan');
     });
 
     it('should return 404 for non-existent customer', async () => {
@@ -321,8 +322,9 @@ describe('Admin Module (e2e) - Laravel Compatibility Tests', () => {
         })
         .expect(200);
 
-      expect(response.body).toHaveProperty('id');
-      expect(response.body.name).toBe('Nome Atualizado');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data.name).toBe('Nome Atualizado');
     });
 
     it('should return 404 for non-existent customer', async () => {
@@ -355,7 +357,7 @@ describe('Admin Module (e2e) - Laravel Compatibility Tests', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .send({
           name: 'Cliente para Deletar',
-          email: 'deletar@verte.com',
+          email: `deletar-${Date.now()}@verte.com`,
           password: 'password123',
           plan_id: testPlan.id,
           cpfCnpj: '98765432109',
@@ -363,13 +365,10 @@ describe('Admin Module (e2e) - Laravel Compatibility Tests', () => {
 
       const customerId = createResponse.body.id;
 
-      const response = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .delete(`/api/v1/config/customers/${customerId}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-
-      expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('sucesso');
+        .expect(204);
 
       // Verify soft delete
       const userRepository = dataSource.getRepository(User);

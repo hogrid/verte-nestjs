@@ -24,6 +24,16 @@ export class CreateCustomPublicDto {
   file: any; // Multer file will be processed in controller
 
   @ApiPropertyOptional({
+    description: 'ID do público (referência para publics table)',
+    example: 1,
+    type: Number,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  id?: number;
+
+  @ApiPropertyOptional({
     description: 'ID do número WhatsApp (se não informado, usa o número ativo)',
     example: 1,
     type: Number,

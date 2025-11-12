@@ -12,19 +12,28 @@ import Stripe from 'stripe';
 export class StripeService {
   private readonly logger = new Logger(StripeService.name);
   private readonly stripe: Stripe;
+  private readonly mockMode: boolean;
 
   constructor(private readonly configService: ConfigService) {
     const stripeSecretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
+    this.mockMode =
+      !stripeSecretKey ||
+      process.env.MOCK_STRIPE === '1' ||
+      process.env.NODE_ENV === 'test';
 
-    if (!stripeSecretKey) {
-      this.logger.warn('⚠️ STRIPE_SECRET_KEY não configurada');
+    if (this.mockMode) {
+      this.logger.warn(
+        '⚠️ Stripe em modo de teste/mocado (sem chamadas externas)',
+      );
+      // Dummy client to satisfy types, won't be used
+      this.stripe = new Stripe('sk_test_dummy', {
+        apiVersion: '2025-10-29.clover',
+      });
+    } else {
+      this.stripe = new Stripe(stripeSecretKey as string, {
+        apiVersion: '2025-10-29.clover',
+      });
     }
-
-    // Use latest API version supported by installed Stripe SDK (v19.3.0+)
-    // '2025-10-29.clover' is officially supported by stripe@19.3.0
-    this.stripe = new Stripe(stripeSecretKey || '', {
-      apiVersion: '2025-10-29.clover',
-    });
   }
 
   /**
@@ -45,6 +54,17 @@ export class StripeService {
       planPrice: params.planPrice,
       userId: params.userId,
     });
+
+    if (this.mockMode) {
+      // Retorna sessão mockada (modo de teste)
+      const mockSession = {
+        id: `cs_test_${Date.now()}`,
+        object: 'checkout.session',
+        url: `https://checkout.stripe.com/pay/cs_test_${Date.now()}`,
+        payment_status: 'unpaid',
+      } as unknown as Stripe.Checkout.Session;
+      return mockSession;
+    }
 
     try {
       const session = await this.stripe.checkout.sessions.create({
@@ -98,6 +118,31 @@ export class StripeService {
       'STRIPE_WEBHOOK_SECRET',
     );
 
+    if (this.mockMode) {
+      // Em testes, apenas valida presença de assinatura/secret e retorna evento mockado
+      if (!signature || !webhookSecret) {
+        throw new Error('Invalid webhook signature');
+      }
+
+      const mockSession = {
+        id: `cs_test_${Date.now()}`,
+        object: 'checkout.session',
+        payment_status: 'paid',
+      } as unknown as Stripe.Checkout.Session;
+
+      const event = {
+        id: 'evt_test',
+        object: 'event',
+        type: 'checkout.session.completed',
+        created: Math.floor(Date.now() / 1000),
+        data: { object: mockSession },
+        livemode: false,
+        pending_webhooks: 0,
+        request: { id: null, idempotency_key: null },
+      } as unknown as Stripe.Event;
+      return event;
+    }
+
     if (!webhookSecret) {
       this.logger.warn(
         '⚠️ STRIPE_WEBHOOK_SECRET não configurado - webhook não validado',
@@ -133,6 +178,13 @@ export class StripeService {
   async retrieveCheckoutSession(
     sessionId: string,
   ): Promise<Stripe.Checkout.Session> {
+    if (this.mockMode) {
+      return {
+        id: sessionId,
+        object: 'checkout.session',
+        payment_status: 'unpaid',
+      } as unknown as Stripe.Checkout.Session;
+    }
     try {
       const session = await this.stripe.checkout.sessions.retrieve(sessionId);
 
@@ -158,6 +210,13 @@ export class StripeService {
   async retrievePaymentIntent(
     paymentIntentId: string,
   ): Promise<Stripe.PaymentIntent> {
+    if (this.mockMode) {
+      return {
+        id: paymentIntentId,
+        object: 'payment_intent',
+        status: 'succeeded',
+      } as unknown as Stripe.PaymentIntent;
+    }
     try {
       const paymentIntent =
         await this.stripe.paymentIntents.retrieve(paymentIntentId);

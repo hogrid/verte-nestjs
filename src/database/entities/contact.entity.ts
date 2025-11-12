@@ -25,7 +25,7 @@ export class Contact {
   @Column({ type: 'bigint', unsigned: true })
   user_id: number;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'int', nullable: true, default: null })
   public_id: number | null;
 
   @Column({ type: 'int', nullable: true })

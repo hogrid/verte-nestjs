@@ -3,7 +3,11 @@ import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
 import type { Job, Queue } from 'bull';
-import { QUEUE_NAMES, getDLQName, advancedRetryConfig } from '../../config/redis.config';
+import {
+  QUEUE_NAMES,
+  getDLQName,
+  advancedRetryConfig,
+} from '../../config/redis.config';
 import { Campaign } from '../../database/entities/campaign.entity';
 import { PublicByContact } from '../../database/entities/public-by-contact.entity';
 import { Number } from '../../database/entities/number.entity';
@@ -69,7 +73,9 @@ export class CampaignsProcessor {
         relations: ['number', 'public', 'messages'],
       });
 
-      this.logger.log(`📋 Encontradas ${scheduledCampaigns.length} campanhas agendadas`);
+      this.logger.log(
+        `📋 Encontradas ${scheduledCampaigns.length} campanhas agendadas`,
+      );
 
       for (const campaign of scheduledCampaigns) {
         await this.processCampaign(campaign);
@@ -77,7 +83,10 @@ export class CampaignsProcessor {
 
       this.logger.log('✅ Processamento de campanhas agendadas concluído');
     } catch (error) {
-      this.logger.error('❌ Erro ao processar campanhas agendadas', getErrorStack(error));
+      this.logger.error(
+        '❌ Erro ao processar campanhas agendadas',
+        getErrorStack(error),
+      );
       throw error;
     }
   }
@@ -107,7 +116,10 @@ export class CampaignsProcessor {
 
       this.logger.log(`✅ Campanha #${campaignId} processada com sucesso`);
     } catch (error) {
-      this.logger.error(`❌ Erro ao processar campanha #${campaignId}`, getErrorStack(error));
+      this.logger.error(
+        `❌ Erro ao processar campanha #${campaignId}`,
+        getErrorStack(error),
+      );
       throw error;
     }
   }
@@ -116,7 +128,9 @@ export class CampaignsProcessor {
    * Internal method to process campaign
    */
   private async processCampaign(campaign: Campaign) {
-    this.logger.log(`🔄 Iniciando processamento da campanha #${campaign.id}: ${campaign.name}`);
+    this.logger.log(
+      `🔄 Iniciando processamento da campanha #${campaign.id}: ${campaign.name}`,
+    );
 
     // 1. Verificar se número está conectado
     const number = await this.numberRepository.findOne({
@@ -124,27 +138,43 @@ export class CampaignsProcessor {
     });
 
     if (!number) {
-      this.logger.error(`❌ Número #${campaign.number_id} não encontrado para campanha #${campaign.id}`);
-      await this.markCampaignAsFailed(campaign, 'Número WhatsApp não encontrado');
+      this.logger.error(
+        `❌ Número #${campaign.number_id} não encontrado para campanha #${campaign.id}`,
+      );
+      await this.markCampaignAsFailed(
+        campaign,
+        'Número WhatsApp não encontrado',
+      );
       return;
     }
 
     if (number.status !== 1) {
-      this.logger.error(`❌ Número #${number.id} não está ativo (status: ${number.status})`);
-      await this.markCampaignAsFailed(campaign, 'Número WhatsApp não está ativo');
+      this.logger.error(
+        `❌ Número #${number.id} não está ativo (status: ${number.status})`,
+      );
+      await this.markCampaignAsFailed(
+        campaign,
+        'Número WhatsApp não está ativo',
+      );
       return;
     }
 
     if (!number.status_connection || number.status_connection !== 1) {
       this.logger.error(`❌ Número #${number.id} não está conectado`);
-      await this.markCampaignAsFailed(campaign, 'Número WhatsApp não está conectado');
+      await this.markCampaignAsFailed(
+        campaign,
+        'Número WhatsApp não está conectado',
+      );
       return;
     }
 
     // 2. Buscar contatos do público
     if (!campaign.public_id) {
       this.logger.error(`❌ Campanha #${campaign.id} não tem público definido`);
-      await this.markCampaignAsFailed(campaign, 'Campanha sem público definido');
+      await this.markCampaignAsFailed(
+        campaign,
+        'Campanha sem público definido',
+      );
       return;
     }
 
@@ -157,7 +187,9 @@ export class CampaignsProcessor {
     });
 
     if (contacts.length === 0) {
-      this.logger.warn(`⚠️ Nenhum contato encontrado para público #${campaign.public_id}`);
+      this.logger.warn(
+        `⚠️ Nenhum contato encontrado para público #${campaign.public_id}`,
+      );
       await this.markCampaignAsCompleted(campaign, 0);
       return;
     }
@@ -171,7 +203,9 @@ export class CampaignsProcessor {
     });
 
     if (messages.length === 0) {
-      this.logger.warn(`⚠️ Nenhuma mensagem encontrada para campanha #${campaign.id}`);
+      this.logger.warn(
+        `⚠️ Nenhuma mensagem encontrada para campanha #${campaign.id}`,
+      );
       await this.markCampaignAsFailed(campaign, 'Campanha sem mensagens');
       return;
     }
@@ -188,38 +222,47 @@ export class CampaignsProcessor {
     for (const publicByContact of contacts) {
       try {
         // Criar job para enviar mensagens para este contato
-        await this.whatsappMessageQueue.add('send-campaign-messages', {
-          campaignId: campaign.id,
-          contactId: publicByContact.contact_id,
-          publicByContactId: publicByContact.id,
-          numberId: campaign.number_id,
-          sessionName: number.instance, // WAHA session name
-          messages: messages.map((msg) => ({
-            id: msg.id,
-            type: msg.type,
-            message: msg.message,
-            media: msg.media,
-            media_type: msg.media_type,
-            order: msg.order,
-          })),
-          phone: publicByContact.contact.number, // Número do contato
-        }, {
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 5000, // 5s, 10s, 20s
+        await this.whatsappMessageQueue.add(
+          'send-campaign-messages',
+          {
+            campaignId: campaign.id,
+            contactId: publicByContact.contact_id,
+            publicByContactId: publicByContact.id,
+            numberId: campaign.number_id,
+            sessionName: number.instance, // WAHA session name
+            messages: messages.map((msg) => ({
+              id: msg.id,
+              type: msg.type,
+              message: msg.message,
+              media: msg.media,
+              media_type: msg.media_type,
+              order: msg.order,
+            })),
+            phone: publicByContact.contact.number, // Número do contato
           },
-          // Distribuir envios ao longo do tempo (evitar bloqueio)
-          delay: jobsCreated * 2000, // 2 segundos entre cada envio
-        });
+          {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 5000, // 5s, 10s, 20s
+            },
+            // Distribuir envios ao longo do tempo (evitar bloqueio)
+            delay: jobsCreated * 2000, // 2 segundos entre cada envio
+          },
+        );
 
         jobsCreated++;
       } catch (error) {
-        this.logger.error(`❌ Erro ao criar job para contato #${publicByContact.contact_id}`, getErrorStack(error));
+        this.logger.error(
+          `❌ Erro ao criar job para contato #${publicByContact.contact_id}`,
+          getErrorStack(error),
+        );
       }
     }
 
-    this.logger.log(`✅ Criados ${jobsCreated} jobs de envio para campanha #${campaign.id}`);
+    this.logger.log(
+      `✅ Criados ${jobsCreated} jobs de envio para campanha #${campaign.id}`,
+    );
 
     // 6. Atualizar total_contacts se necessário
     if (!campaign.total_contacts || campaign.total_contacts === 0) {
@@ -233,7 +276,9 @@ export class CampaignsProcessor {
    * Mark campaign as failed
    */
   private async markCampaignAsFailed(campaign: Campaign, reason: string) {
-    this.logger.error(`💀 Marcando campanha #${campaign.id} como falhada: ${reason}`);
+    this.logger.error(
+      `💀 Marcando campanha #${campaign.id} como falhada: ${reason}`,
+    );
 
     await this.campaignRepository.update(campaign.id, {
       status: 2, // Concluída (com erro)
@@ -247,7 +292,9 @@ export class CampaignsProcessor {
    * Mark campaign as completed
    */
   private async markCampaignAsCompleted(campaign: Campaign, totalSent: number) {
-    this.logger.log(`✅ Marcando campanha #${campaign.id} como concluída (${totalSent} enviadas)`);
+    this.logger.log(
+      `✅ Marcando campanha #${campaign.id} como concluída (${totalSent} enviadas)`,
+    );
 
     await this.campaignRepository.update(campaign.id, {
       status: 2, // Concluída
@@ -263,7 +310,9 @@ export class CampaignsProcessor {
    * Chamado pelos WhatsappMessageJobs ao completarem
    */
   @Process('update-campaign-progress')
-  async handleUpdateCampaignProgress(job: Job<{ campaignId: number; contactSent: boolean }>) {
+  async handleUpdateCampaignProgress(
+    job: Job<{ campaignId: number; contactSent: boolean }>,
+  ) {
     const { campaignId, contactSent } = job.data;
 
     try {
@@ -276,11 +325,14 @@ export class CampaignsProcessor {
       }
 
       const processedContacts = (campaign.processed_contacts || 0) + 1;
-      const totalSent = contactSent ? (campaign.total_sent || 0) + 1 : campaign.total_sent || 0;
+      const totalSent = contactSent
+        ? (campaign.total_sent || 0) + 1
+        : campaign.total_sent || 0;
       const totalContacts = campaign.total_contacts || 0;
-      const progress = totalContacts > 0
-        ? Math.round((processedContacts / totalContacts) * 100)
-        : 0;
+      const progress =
+        totalContacts > 0
+          ? Math.round((processedContacts / totalContacts) * 100)
+          : 0;
 
       // Atualizar campanha
       await this.campaignRepository.update(campaignId, {
@@ -296,12 +348,19 @@ export class CampaignsProcessor {
           date_finished: new Date(),
         });
 
-        this.logger.log(`🎉 Campanha #${campaignId} concluída! ${totalSent}/${totalContacts} enviadas`);
+        this.logger.log(
+          `🎉 Campanha #${campaignId} concluída! ${totalSent}/${totalContacts} enviadas`,
+        );
       } else {
-        this.logger.log(`📊 Campanha #${campaignId}: ${processedContacts}/${totalContacts} processados (${progress}%)`);
+        this.logger.log(
+          `📊 Campanha #${campaignId}: ${processedContacts}/${totalContacts} processados (${progress}%)`,
+        );
       }
     } catch (error) {
-      this.logger.error(`❌ Erro ao atualizar progresso da campanha #${campaignId}`, getErrorStack(error));
+      this.logger.error(
+        `❌ Erro ao atualizar progresso da campanha #${campaignId}`,
+        getErrorStack(error),
+      );
       throw error;
     }
   }
@@ -332,35 +391,40 @@ export class CampaignsProcessor {
       );
     }
 
-    this.errorTrackingService.trackJobError(
-      QUEUE_NAMES.CAMPAIGNS,
-      id,
-      error,
-      { jobName: name, data },
-    );
+    this.errorTrackingService.trackJobError(QUEUE_NAMES.CAMPAIGNS, id, error, {
+      jobName: name,
+      data,
+    });
 
     // Send to Dead Letter Queue
     try {
-      await this.campaignsDLQ.add('failed-campaign-job', {
-        originalJob: {
-          name,
-          data,
-          id,
-          attemptsMade,
+      await this.campaignsDLQ.add(
+        'failed-campaign-job',
+        {
+          originalJob: {
+            name,
+            data,
+            id,
+            attemptsMade,
+          },
+          error: {
+            message: error.message,
+            stack: error.stack,
+          },
+          failedAt: new Date(),
         },
-        error: {
-          message: error.message,
-          stack: error.stack,
+        {
+          attempts: 1, // DLQ não faz retry
+          removeOnComplete: false, // Manter para análise
         },
-        failedAt: new Date(),
-      }, {
-        attempts: 1, // DLQ não faz retry
-        removeOnComplete: false, // Manter para análise
-      });
+      );
 
       this.logger.log(`📬 Job enviado para Dead Letter Queue: campaigns-dlq`);
     } catch (dlqError) {
-      this.logger.error('❌ Erro ao enviar job para DLQ', getErrorStack(dlqError));
+      this.logger.error(
+        '❌ Erro ao enviar job para DLQ',
+        getErrorStack(dlqError),
+      );
     }
   }
 }

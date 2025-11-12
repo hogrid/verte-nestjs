@@ -62,16 +62,27 @@ export class WhatsappMessageProcessor {
    */
   @Process('send-campaign-messages')
   async handleSendCampaignMessages(job: Job<WhatsappMessageJobData>) {
-    const { campaignId, contactId, publicByContactId, sessionName, messages, phone } = job.data;
+    const {
+      campaignId,
+      contactId,
+      publicByContactId,
+      sessionName,
+      messages,
+      phone,
+    } = job.data;
 
-    this.logger.log(`📤 Enviando mensagens da campanha #${campaignId} para contato #${contactId} (${phone})`);
+    this.logger.log(
+      `📤 Enviando mensagens da campanha #${campaignId} para contato #${contactId} (${phone})`,
+    );
 
     let allMessagesSent = true;
     let errorMessage = '';
 
     try {
       // Ordenar mensagens por order
-      const sortedMessages = messages.sort((a, b) => (a.order || 0) - (b.order || 0));
+      const sortedMessages = messages.sort(
+        (a, b) => (a.order || 0) - (b.order || 0),
+      );
 
       // Enviar cada mensagem
       for (const message of sortedMessages) {
@@ -83,7 +94,10 @@ export class WhatsappMessageProcessor {
           const delay = 1000 + Math.random() * 2000;
           await this.sleep(delay);
         } catch (error) {
-          this.logger.error(`❌ Erro ao enviar mensagem ${message.order} para ${phone}`, getErrorStack(error));
+          this.logger.error(
+            `❌ Erro ao enviar mensagem ${message.order} para ${phone}`,
+            getErrorStack(error),
+          );
           allMessagesSent = false;
           errorMessage = getErrorMessage(error);
           break; // Para no primeiro erro
@@ -106,10 +120,15 @@ export class WhatsappMessageProcessor {
       if (allMessagesSent) {
         this.logger.log(`✅ Todas as mensagens enviadas para ${phone}`);
       } else {
-        this.logger.warn(`⚠️ Falha no envio de mensagens para ${phone}: ${errorMessage}`);
+        this.logger.warn(
+          `⚠️ Falha no envio de mensagens para ${phone}: ${errorMessage}`,
+        );
       }
     } catch (error) {
-      this.logger.error(`❌ Erro geral ao processar envio para ${phone}`, getErrorStack(error));
+      this.logger.error(
+        `❌ Erro geral ao processar envio para ${phone}`,
+        getErrorStack(error),
+      );
 
       // Atualizar como erro
       await this.publicByContactRepository.update(publicByContactId, {
@@ -155,12 +174,22 @@ export class WhatsappMessageProcessor {
 
         case 'image':
         case '2':
-          await this.wahaService.sendImage(sessionName, phone, mediaUrl, messageText);
+          await this.wahaService.sendImage(
+            sessionName,
+            phone,
+            mediaUrl,
+            messageText,
+          );
           break;
 
         case 'video':
         case '4':
-          await this.wahaService.sendVideo(sessionName, phone, mediaUrl, messageText);
+          await this.wahaService.sendVideo(
+            sessionName,
+            phone,
+            mediaUrl,
+            messageText,
+          );
           break;
 
         case 'audio':
@@ -169,7 +198,12 @@ export class WhatsappMessageProcessor {
           break;
 
         case 'document':
-          await this.wahaService.sendImage(sessionName, phone, mediaUrl, messageText);
+          await this.wahaService.sendImage(
+            sessionName,
+            phone,
+            mediaUrl,
+            messageText,
+          );
           break;
 
         default:

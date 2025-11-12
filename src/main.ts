@@ -47,16 +47,18 @@ async function bootstrap() {
       },
       // Custom exception factory to format errors like Laravel
       exceptionFactory: (errors) => {
-        const formattedErrors: Record<string, string[]> = {};
+        // Collect all error messages in a flat array
+        const messages: string[] = [];
 
         errors.forEach((error) => {
           if (error.constraints) {
-            formattedErrors[error.property] = Object.values(error.constraints);
+            messages.push(...Object.values(error.constraints));
           }
         });
 
         return new BadRequestException({
-          errors: formattedErrors,
+          message: messages,
+          error: 'Unprocessable Entity',
           statusCode: 422,
         });
       },

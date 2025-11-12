@@ -1,4 +1,5 @@
 import type { QueueOptions } from 'bull';
+import { getQueueToken } from '@nestjs/bull';
 
 /**
  * Redis Configuration
@@ -81,7 +82,7 @@ export const QUEUE_NAMES = {
   WHATSAPP_MESSAGE_DLQ: 'whatsapp-message-dlq',
 } as const;
 
-export type QueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];
+export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
 
 /**
  * Dead Letter Queue Mapping
@@ -100,4 +101,31 @@ export const DLQ_MAPPING: Record<string, string> = {
  */
 export function getDLQName(queueName: string): string | undefined {
   return DLQ_MAPPING[queueName];
+}
+
+/**
+ * Utilities for tests: create mock providers for Bull queues
+ */
+export function createMockQueueProviders() {
+  const names = [
+    QUEUE_NAMES.CAMPAIGNS,
+    QUEUE_NAMES.SIMPLIFIED_PUBLIC,
+    QUEUE_NAMES.CUSTOM_PUBLIC,
+    QUEUE_NAMES.WHATSAPP_MESSAGE,
+    QUEUE_NAMES.CAMPAIGNS_DLQ,
+    QUEUE_NAMES.SIMPLIFIED_PUBLIC_DLQ,
+    QUEUE_NAMES.CUSTOM_PUBLIC_DLQ,
+    QUEUE_NAMES.WHATSAPP_MESSAGE_DLQ,
+  ];
+
+  const fakeQueue = {
+    add: async () => ({ id: 'mock-job' }),
+    pause: async () => void 0,
+    resume: async () => void 0,
+  };
+
+  return names.map((name) => ({
+    provide: getQueueToken(name),
+    useValue: fakeQueue,
+  }));
 }

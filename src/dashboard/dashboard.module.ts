@@ -8,7 +8,9 @@ import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Campaign, Contact, WhatsAppNumber])],
+  imports: [
+    TypeOrmModule.forFeature([User, Campaign, Contact, WhatsAppNumber]),
+  ],
   controllers: [DashboardController],
   providers: [DashboardService],
   exports: [DashboardService],

@@ -62,9 +62,13 @@ describe('Files Module (e2e) - Laravel Compatibility Tests', () => {
 
   afterAll(async () => {
     if (testUser) {
-      // Cleanup uploaded files
-      const mediaRepository = dataSource.getRepository('media');
-      await mediaRepository.delete({ user_id: testUser.id });
+      // Cleanup uploaded files (tabela legacy 'media' pode não existir)
+      try {
+        const mediaRepository = dataSource.getRepository('media');
+        await mediaRepository.delete({ user_id: testUser.id });
+      } catch (err) {
+        // Ignorar erro se tabela 'media' não existir no ambiente
+      }
 
       const numberRepository = dataSource.getRepository('numbers');
       await numberRepository.delete({ user_id: testUser.id });
@@ -143,7 +147,9 @@ describe('Files Module (e2e) - Laravel Compatibility Tests', () => {
 
     it('should upload PDF file successfully', async () => {
       // Create a minimal PDF buffer
-      const testPdf = Buffer.from('%PDF-1.0\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000010 00000 n\n0000000053 00000 n\n0000000102 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n149\n%EOF');
+      const testPdf = Buffer.from(
+        '%PDF-1.0\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj 3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f\n0000000010 00000 n\n0000000053 00000 n\n0000000102 00000 n\ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n149\n%EOF',
+      );
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/upload-media')
@@ -235,8 +241,9 @@ describe('Files Module (e2e) - Laravel Compatibility Tests', () => {
       }
 
       // Download should work without auth token
-      const response = await request(app.getHttpServer())
-        .get(`/api/v1/download-file/${uploadedFileId}`);
+      const response = await request(app.getHttpServer()).get(
+        `/api/v1/download-file/${uploadedFileId}`,
+      );
 
       expect([200, 404]).toContain(response.status);
     });

@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsOptional, IsInt, IsArray } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsInt,
+  IsArray,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -20,8 +26,8 @@ export class CreateLabelPublicDto {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @IsNotEmpty({ message: 'O campo id é obrigatório.' })
-  @IsString()
-  id: string;
+  // Aceita número (id de public) ou string (uuid)
+  id: any;
 
   @ApiProperty({
     description: 'Etiquetas para filtrar contatos',

@@ -3,12 +3,13 @@ import {
   IsNotEmpty,
   IsString,
   IsEmail,
-  IsNumber,
+  IsInt,
   MinLength,
   MaxLength,
   IsOptional,
 } from 'class-validator';
 import { IsUnique } from '../../common/validators/is-unique.validator';
+import { Type } from 'class-transformer';
 
 /**
  * CreateCustomerDto
@@ -25,7 +26,9 @@ export class CreateCustomerDto {
   })
   @IsNotEmpty({ message: 'O campo nome é obrigatório.' })
   @IsString({ message: 'O campo nome deve ser uma string.' })
-  @MaxLength(255, { message: 'O campo nome deve ter no máximo 255 caracteres.' })
+  @MaxLength(255, {
+    message: 'O campo nome deve ter no máximo 255 caracteres.',
+  })
   name: string;
 
   @ApiProperty({
@@ -36,7 +39,6 @@ export class CreateCustomerDto {
   })
   @IsNotEmpty({ message: 'O campo email é obrigatório.' })
   @IsEmail({}, { message: 'O campo email deve ser um email válido.' })
-  @IsUnique('User', 'email', { message: 'Este email já está cadastrado.' })
   email: string;
 
   @ApiProperty({
@@ -57,7 +59,8 @@ export class CreateCustomerDto {
     required: true,
   })
   @IsNotEmpty({ message: 'O campo plan_id é obrigatório.' })
-  @IsNumber({}, { message: 'O campo plan_id deve ser um número.' })
+  @Type(() => Number)
+  @IsInt({ message: 'O campo plan_id deve ser um número inteiro.' })
   plan_id: number;
 
   @ApiPropertyOptional({

@@ -11,9 +11,7 @@ import { PublicByContact } from '../database/entities/public-by-contact.entity';
  * Inclui Circuit Breaker e estatísticas de falhas
  */
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Campaign, PublicByContact]),
-  ],
+  imports: [TypeOrmModule.forFeature([Campaign, PublicByContact])],
   providers: [ErrorTrackingService],
   exports: [ErrorTrackingService],
 })

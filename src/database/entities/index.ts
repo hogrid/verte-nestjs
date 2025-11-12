@@ -6,5 +6,6 @@ export * from './configuration.entity';
 export * from './password-reset.entity';
 export * from './payment.entity';
 export * from './file.entity';
+export * from './media.entity';
 export * from './message-template.entity';
 export * from './setting.entity';

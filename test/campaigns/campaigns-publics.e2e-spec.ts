@@ -116,8 +116,8 @@ describe('CampaignsController (e2e) - FASE 2: Públicos', () => {
 
     // Create test label
     await dataSource.query(`
-      INSERT INTO labels (user_id, name, created_at, updated_at)
-      VALUES (${testUserId}, 'PROJECT=verte', NOW(), NOW())
+      INSERT INTO labels (user_id, number_id, name, created_at, updated_at)
+      VALUES (${testUserId}, ${testNumberId}, 'PROJECT=verte', NOW(), NOW())
     `);
 
     const [label] = await dataSource.query(
@@ -139,12 +139,9 @@ describe('CampaignsController (e2e) - FASE 2: Públicos', () => {
     );
     testContactId = contact.id;
 
-    // Create public_by_contact relationships
-    await dataSource.query(`
-      INSERT INTO public_by_contact (user_id, public_id, contact_id, number_id, label, status, created_at, updated_at)
-      SELECT ${testUserId}, ${testPublicId}, id, ${testNumberId}, labels, 1, NOW(), NOW()
-      FROM contacts WHERE user_id = ${testUserId}
-    `);
+    // Observação: o relacionamento public_by_contacts não é necessário
+    // para os endpoints testados, pois a listagem usa diretamente a
+    // tabela de contacts com filtros. Mantemos os dados apenas em contacts.
 
     // Login to get auth token
     const loginResponse = await request(app.getHttpServer())
@@ -161,10 +158,10 @@ describe('CampaignsController (e2e) - FASE 2: Públicos', () => {
   afterAll(async () => {
     // Cleanup in reverse order of dependencies
     await dataSource.query(
-      `DELETE FROM public_by_contact WHERE user_id = ${testUserId}`,
+      `DELETE FROM public_by_contacts WHERE user_id = ${testUserId}`,
     );
     await dataSource.query(
-      `DELETE FROM simplified_publics WHERE user_id = ${testUserId}`,
+      `DELETE FROM simplified_public WHERE user_id = ${testUserId}`,
     );
     await dataSource.query(
       `DELETE FROM custom_publics WHERE user_id = ${testUserId}`,
@@ -244,14 +241,14 @@ describe('CampaignsController (e2e) - FASE 2: Públicos', () => {
    */
   describe('GET /api/v1/campaigns/simplified/public/:id', () => {
     beforeAll(async () => {
-      // Create a simplified public for this test
+      // Criar um registro simplificado mínimo (estrutura atual)
       await dataSource.query(`
-        INSERT INTO simplified_publics (user_id, public_id, number_id, status, created_at, updated_at)
-        VALUES (${testUserId}, ${testPublicId}, ${testNumberId}, 2, NOW(), NOW())
+        INSERT INTO simplified_public (user_id, number_id, status, created_at, updated_at)
+        VALUES (${testUserId}, ${testNumberId}, 2, NOW(), NOW())
       `);
 
       const [sp] = await dataSource.query(
-        `SELECT id FROM simplified_publics WHERE user_id = ${testUserId} LIMIT 1`,
+        `SELECT id FROM simplified_public WHERE user_id = ${testUserId} LIMIT 1`,
       );
       testSimplifiedPublicId = sp.id;
     });
@@ -366,14 +363,14 @@ describe('CampaignsController (e2e) - FASE 2: Públicos', () => {
     });
 
     it('should return 201 status (Laravel compat)', async () => {
-      // Create another simplified public to cancel
+      // Create another simplified public to cancel (estrutura atual)
       await dataSource.query(`
-        INSERT INTO simplified_publics (user_id, public_id, number_id, status, created_at, updated_at)
-        VALUES (${testUserId}, ${testPublicId}, ${testNumberId}, 2, NOW(), NOW())
+        INSERT INTO simplified_public (user_id, number_id, status, created_at, updated_at)
+        VALUES (${testUserId}, ${testNumberId}, 2, NOW(), NOW())
       `);
 
       const [sp] = await dataSource.query(
-        `SELECT id FROM simplified_publics WHERE user_id = ${testUserId} AND status = 2 ORDER BY id DESC LIMIT 1`,
+        `SELECT id FROM simplified_public WHERE user_id = ${testUserId} AND status = 2 ORDER BY id DESC LIMIT 1`,
       );
 
       return request(app.getHttpServer())
@@ -414,7 +411,10 @@ describe('CampaignsController (e2e) - FASE 2: Públicos', () => {
       // Create a minimal valid XLSX file (using a simple text file as placeholder)
       // In a real scenario, you would use a library like exceljs to create a proper XLSX
       const xlsxContent = Buffer.from([
-        0x50, 0x4b, 0x03, 0x04, // XLSX is a ZIP file, this is the ZIP header
+        0x50,
+        0x4b,
+        0x03,
+        0x04, // XLSX is a ZIP file, this is the ZIP header
       ]);
       fs.writeFileSync(testXlsxPath, xlsxContent);
     });
@@ -513,10 +513,10 @@ describe('CampaignsController (e2e) - FASE 2: Públicos', () => {
    */
   describe('PUT /api/v1/campaigns/custom/public/:id', () => {
     beforeAll(async () => {
-      // Create a custom public for this test
+      // Create a custom public for this test (estrutura atual)
       await dataSource.query(`
-        INSERT INTO custom_publics (user_id, public_id, number_id, status, file_path, created_at, updated_at)
-        VALUES (${testUserId}, ${testPublicId}, ${testNumberId}, 2, 'test.xlsx', NOW(), NOW())
+        INSERT INTO custom_publics (user_id, number_id, file, status, created_at, updated_at)
+        VALUES (${testUserId}, ${testNumberId}, 'test.xlsx', 2, NOW(), NOW())
       `);
 
       const [cp] = await dataSource.query(
@@ -539,10 +539,10 @@ describe('CampaignsController (e2e) - FASE 2: Públicos', () => {
     });
 
     it('should return 201 status (Laravel compat)', async () => {
-      // Create another custom public to cancel
+      // Create another custom public to cancel (estrutura atual)
       await dataSource.query(`
-        INSERT INTO custom_publics (user_id, public_id, number_id, status, file_path, created_at, updated_at)
-        VALUES (${testUserId}, ${testPublicId}, ${testNumberId}, 2, 'test2.xlsx', NOW(), NOW())
+        INSERT INTO custom_publics (user_id, number_id, file, status, created_at, updated_at)
+        VALUES (${testUserId}, ${testNumberId}, 'test2.xlsx', 2, NOW(), NOW())
       `);
 
       const [cp] = await dataSource.query(

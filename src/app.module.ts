@@ -24,6 +24,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { UserProfileModule } from './user-profile/user-profile.module';
 import { ExtractorModule } from './extractor/extractor.module';
 import { RemainingModule } from './remaining/remaining.module';
+import { TestDbSetupService } from './testing/test-db-setup.service';
 
 @Module({
   imports: [
@@ -47,7 +48,12 @@ import { RemainingModule } from './remaining/remaining.module';
         synchronize: false, // CRITICAL: Never sync - use existing Laravel tables
         charset: 'utf8mb4',
         timezone: '+00:00',
-        logging: configService.get('NODE_ENV') === 'development',
+        logging:
+          configService.get('NODE_ENV') === 'development'
+            ? true
+            : configService.get('NODE_ENV') === 'test'
+              ? ['error', 'warn', 'query']
+              : false,
         // Fix bigint returning as string
         supportBigNumbers: true,
         bigNumberStrings: false, // Return bigint as number (safe for IDs < 2^53)
@@ -77,6 +83,6 @@ import { RemainingModule } from './remaining/remaining.module';
     RemainingModule, // Final endpoints: integrations, webhooks, CORS, tests (18 endpoints)
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, TestDbSetupService],
 })
 export class AppModule {}

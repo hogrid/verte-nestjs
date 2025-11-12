@@ -62,9 +62,12 @@ export class CustomPublicProcessor {
    */
   @Process('process-custom-public')
   async handleProcessCustomPublic(job: Job<CustomPublicJobData>) {
-    const { customPublicId, userId, campaignId, filePath, numberNumber } = job.data;
+    const { customPublicId, userId, campaignId, filePath, numberNumber } =
+      job.data;
 
-    this.logger.log(`🚀 Processando público customizado #${customPublicId} (arquivo: ${filePath})`);
+    this.logger.log(
+      `🚀 Processando público customizado #${customPublicId} (arquivo: ${filePath})`,
+    );
 
     try {
       // 1. Buscar CustomPublic
@@ -87,7 +90,9 @@ export class CustomPublicProcessor {
       const workbook = xlsx.readFile(filePath);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const data = xlsx.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+      const data = xlsx.utils.sheet_to_json(worksheet, {
+        header: 1,
+      }) as unknown as any[][]; // rows as arrays when header: 1
 
       this.logger.log(`📄 Arquivo XLSX lido: ${data.length} linhas`);
 
@@ -96,7 +101,7 @@ export class CustomPublicProcessor {
       const phonesSeen = new Set<string>();
 
       for (let i = 0; i < data.length; i++) {
-        const row = data[i];
+        const row = data[i] ?? [];
 
         // Pular linhas vazias
         if (!row || row.length === 0) {
@@ -104,12 +109,19 @@ export class CustomPublicProcessor {
         }
 
         // Pular header (primeira linha)
-        if (i === 0 && (row[0] === 'Nome' || row[0] === 'name' || row[0] === 'Telefone')) {
+        if (
+          i === 0 &&
+          (row[0] === 'Nome' || row[0] === 'name' || row[0] === 'Telefone')
+        ) {
           continue;
         }
 
-        const name = row[0] ? String(row[0]).trim() : '';
-        const phoneRaw = row[1] ? String(row[1]).trim() : row[0] ? String(row[0]).trim() : '';
+        const name = row[0] ? String(row[0] as string).trim() : '';
+        const phoneRaw = row[1]
+          ? String(row[1] as string).trim()
+          : row[0]
+            ? String(row[0] as string).trim()
+            : '';
 
         if (!phoneRaw) {
           this.logger.warn(`⚠️ Linha ${i + 1}: Telefone vazio, pulando`);
@@ -121,7 +133,9 @@ export class CustomPublicProcessor {
 
         // Evitar duplicatas no mesmo arquivo
         if (phonesSeen.has(phone)) {
-          this.logger.warn(`⚠️ Linha ${i + 1}: Telefone ${phone} duplicado no arquivo, pulando`);
+          this.logger.warn(
+            `⚠️ Linha ${i + 1}: Telefone ${phone} duplicado no arquivo, pulando`,
+          );
           continue;
         }
         phonesSeen.add(phone);
@@ -143,7 +157,9 @@ export class CustomPublicProcessor {
           contact = await this.contactRepository.save(contact);
           this.logger.log(`✅ Contato criado: ${contact.name} (${phone})`);
         } else {
-          this.logger.log(`♻️ Contato já existe: ${contact.name || 'Sem nome'} (${phone})`);
+          this.logger.log(
+            `♻️ Contato já existe: ${contact.name || 'Sem nome'} (${phone})`,
+          );
         }
 
         contacts.push(contact);
@@ -192,7 +208,9 @@ export class CustomPublicProcessor {
           .values(publicByContactsData)
           .execute();
 
-        this.logger.log(`✅ Criados ${publicByContactsData.length} registros em PublicByContact`);
+        this.logger.log(
+          `✅ Criados ${publicByContactsData.length} registros em PublicByContact`,
+        );
       }
 
       // 7. Atualizar CustomPublic status (public_id não existe na entity)
@@ -206,7 +224,9 @@ export class CustomPublicProcessor {
         this.logger.log(`🗑️ Arquivo temporário removido: ${filePath}`);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`⚠️ Erro ao remover arquivo temporário: ${errorMessage}`);
+        this.logger.warn(
+          `⚠️ Erro ao remover arquivo temporário: ${errorMessage}`,
+        );
       }
 
       // 9. Retornar dados para o callback
@@ -215,7 +235,10 @@ export class CustomPublicProcessor {
         totalContacts: contacts.length,
       };
     } catch (error) {
-      this.logger.error(`❌ Erro ao processar público customizado #${customPublicId}`, getErrorStack(error));
+      this.logger.error(
+        `❌ Erro ao processar público customizado #${customPublicId}`,
+        getErrorStack(error),
+      );
       throw error;
     }
   }

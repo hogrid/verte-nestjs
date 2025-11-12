@@ -6,6 +6,7 @@ import {
   Body,
   Request,
   UseGuards,
+  HttpCode,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -36,7 +37,7 @@ export class UtilitiesController {
   constructor(private readonly utilitiesService: UtilitiesService) {}
 
   /**
-   * 1. GET /api/health
+   * 1. GET /api/health (backward compatibility)
    * Health check da aplicação
    */
   @Get('health')
@@ -61,6 +62,20 @@ export class UtilitiesController {
   }
 
   /**
+   * 1b. GET /api/v1/health
+   * Health check da aplicação (Laravel-compatible)
+   */
+  @Get('v1/health')
+  @ApiOperation({
+    summary: 'Health check (v1)',
+    description: 'Verifica status da aplicação (Laravel-compatible)',
+  })
+  @ApiResponse({ status: 200, description: 'Aplicação saudável' })
+  getHealthV1() {
+    return this.utilitiesService.getHealth();
+  }
+
+  /**
    * 2. GET /api/v1/cors-test
    * Teste de configuração CORS
    */
@@ -72,6 +87,162 @@ export class UtilitiesController {
   @ApiResponse({ status: 200, description: 'CORS configurado corretamente' })
   testCors() {
     return this.utilitiesService.testCors();
+  }
+
+  /**
+   * Laravel-compatible Recovery Endpoints
+   */
+  @Get('v1/recovery/campaigns')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Recuperar campanhas',
+    description: 'Lista campanhas deletadas recuperáveis',
+  })
+  @ApiResponse({ status: 200, description: 'Campanhas listadas' })
+  async getRecoverableCampaigns(@Request() req: { user: { id: number } }) {
+    return this.utilitiesService.getRecoverableCampaigns(req.user.id);
+  }
+
+  @Get('v1/recovery/contacts')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Recuperar contatos',
+    description: 'Lista contatos deletados recuperáveis',
+  })
+  @ApiResponse({ status: 200, description: 'Contatos listados' })
+  async getRecoverableContacts(@Request() req: { user: { id: number } }) {
+    return this.utilitiesService.getRecoverableContacts(req.user.id);
+  }
+
+  @Post('v1/recovery/restore-campaign')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Restaurar campanha',
+    description: 'Restaura uma campanha deletada',
+  })
+  @ApiResponse({ status: 200, description: 'Campanha restaurada' })
+  @ApiResponse({ status: 404, description: 'Campanha não encontrada' })
+  @HttpCode(200)
+  async restoreCampaign(
+    @Request() req: { user: { id: number } },
+    @Body('campaign_id') campaignId: number,
+  ) {
+    return this.utilitiesService.restoreCampaign(req.user.id, campaignId);
+  }
+
+  /**
+   * Laravel-compatible Debug Endpoints
+   */
+  @Post('v1/debug/user-data')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Dados de debug do usuário',
+    description: 'Retorna informações de debug do usuário',
+  })
+  @ApiResponse({ status: 200, description: 'Dados retornados' })
+  @HttpCode(200)
+  async getUserDebugData(@Request() req: { user: { id: number } }) {
+    return this.utilitiesService.getUserDebugData(req.user.id);
+  }
+
+  @Get('v1/debug/database-status')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Status do banco de dados',
+    description: 'Verifica conexão com banco de dados',
+  })
+  @ApiResponse({ status: 200, description: 'Status retornado' })
+  async getDatabaseStatus() {
+    return this.utilitiesService.getDatabaseStatus();
+  }
+
+  @Post('v1/debug/clear-user-cache')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Limpar cache do usuário',
+    description: 'Limpa cache e dados temporários do usuário',
+  })
+  @ApiResponse({ status: 200, description: 'Cache limpo' })
+  @HttpCode(200)
+  async clearUserCache(@Request() req: { user: { id: number } }) {
+    return this.utilitiesService.clearUserCache(req.user.id);
+  }
+
+  /**
+   * Laravel-compatible Sync Endpoints
+   */
+  @Get('v1/sync/contacts')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Sincronizar contatos',
+    description: 'Sincroniza contatos do usuário',
+  })
+  @ApiResponse({ status: 200, description: 'Sincronização concluída' })
+  async syncContacts(@Request() req: { user: { id: number } }) {
+    return this.utilitiesService.syncContacts(req.user.id);
+  }
+
+  @Get('v1/sync/campaigns')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Sincronizar campanhas',
+    description: 'Sincroniza campanhas do usuário',
+  })
+  @ApiResponse({ status: 200, description: 'Sincronização concluída' })
+  async syncCampaigns(@Request() req: { user: { id: number } }) {
+    return this.utilitiesService.syncCampaigns(req.user.id);
+  }
+
+  @Post('v1/sync/force-sync-all')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Forçar sincronização completa',
+    description: 'Força sincronização de todos os dados do usuário',
+  })
+  @ApiResponse({ status: 200, description: 'Sincronização forçada' })
+  @HttpCode(200)
+  async forceSyncAll(@Request() req: { user: { id: number } }) {
+    return this.utilitiesService.forceSyncAll(req.user.id);
+  }
+
+  /**
+   * Laravel-compatible User Configuration Endpoints
+   */
+  @Get('v1/user-configuration')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Obter configurações do usuário',
+    description: 'Retorna configurações personalizadas do usuário',
+  })
+  @ApiResponse({ status: 200, description: 'Configurações retornadas' })
+  async getUserConfiguration(@Request() req: { user: { id: number } }) {
+    return this.utilitiesService.getUserConfiguration(req.user.id);
+  }
+
+  @Post('v1/user-configuration')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Salvar configurações do usuário',
+    description: 'Salva configurações personalizadas do usuário',
+  })
+  @ApiResponse({ status: 200, description: 'Configurações salvas' })
+  @HttpCode(200)
+  async saveUserConfigurationV1(
+    @Request() req: { user: { id: number } },
+    @Body() config: any,
+  ) {
+    return this.utilitiesService.saveUserConfigurationV1(req.user.id, config);
   }
 
   /**
@@ -371,6 +542,9 @@ export class UtilitiesController {
     @Request() req: { user: { id: number } },
     @Body('configurations') configurations: Record<string, any>,
   ) {
-    return this.utilitiesService.saveUserConfiguration(req.user.id, configurations);
+    return this.utilitiesService.saveUserConfiguration(
+      req.user.id,
+      configurations,
+    );
   }
 }

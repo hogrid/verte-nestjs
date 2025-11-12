@@ -21,7 +21,9 @@ export class UpdateTemplateDto {
   })
   @IsOptional()
   @IsString({ message: 'O campo nome deve ser uma string.' })
-  @MaxLength(255, { message: 'O campo nome deve ter no máximo 255 caracteres.' })
+  @MaxLength(255, {
+    message: 'O campo nome deve ter no máximo 255 caracteres.',
+  })
   name?: string;
 
   @ApiPropertyOptional({
@@ -40,7 +42,9 @@ export class UpdateTemplateDto {
   })
   @IsOptional()
   @IsString({ message: 'O campo categoria deve ser uma string.' })
-  @MaxLength(50, { message: 'O campo categoria deve ter no máximo 50 caracteres.' })
+  @MaxLength(50, {
+    message: 'O campo categoria deve ter no máximo 50 caracteres.',
+  })
   category?: string;
 
   @ApiPropertyOptional({

@@ -111,7 +111,12 @@ Lista todas as campanhas do usuário com filtros e paginação.
     type: Number,
     description: 'Itens por página',
   })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Página' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Página',
+  })
   @ApiResponse({
     status: 200,
     description: 'Campanhas listadas com sucesso',
@@ -322,10 +327,7 @@ Retorna os detalhes de uma campanha específica.
     },
   })
   @ApiResponse({ status: 404, description: 'Campanha não encontrada' })
-  async findOne(
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: any,
-  ) {
+  async findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const campaign = await this.campaignsService.findOne(req.user.id, id);
     return { data: campaign };
   }
@@ -360,10 +362,7 @@ Cancela uma campanha em andamento ou agendada.
     },
   })
   @ApiResponse({ status: 404, description: 'Campanha não encontrada.' })
-  async cancel(
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: any,
-  ) {
+  async cancel(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.campaignsService.cancel(req.user.id, id);
   }
 
@@ -434,7 +433,7 @@ Lista contatos de um público simplificado com filtros.
       req.user.id,
       dto,
     );
-    return { data: result };
+    return { data: (result as any).data };
   }
 
   /**
@@ -459,7 +458,11 @@ Retorna informações de um público simplificado específico.
 **Compatibilidade**: 100% Laravel CampaignsController@show_simplified_public
     `,
   })
-  @ApiParam({ name: 'id', description: 'ID do público simplificado', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do público simplificado',
+    type: Number,
+  })
   @ApiResponse({
     status: 200,
     description: 'Público encontrado',
@@ -483,7 +486,7 @@ Retorna informações de um público simplificado específico.
       req.user.id,
       id,
     );
-    return { data: result };
+    return result;
   }
 
   /**
@@ -572,7 +575,11 @@ Cancela públicos simplificados em andamento (status 2).
 **Compatibilidade**: 100% Laravel CampaignsController@put_simplified_public
     `,
   })
-  @ApiParam({ name: 'id', description: 'ID do público simplificado', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do público simplificado',
+    type: Number,
+  })
   @ApiResponse({
     status: 201,
     description: 'Público simplificado atualizado',
@@ -693,7 +700,8 @@ Cria um público customizado a partir de arquivo XLSX.
           number_id: 1,
           user_id: 1,
           status: 2,
-          file_path: 'uploads/custom_publics/custom-public-1699999999999-123456789.xlsx',
+          file_path:
+            'uploads/custom_publics/custom-public-1699999999999-123456789.xlsx',
           created_at: '2024-11-04T00:00:00.000Z',
           updated_at: '2024-11-04T00:00:00.000Z',
         },
@@ -778,7 +786,7 @@ Lista contatos de um público customizado (reusa lógica de público simplificad
       req.user.id,
       dto,
     );
-    return { data: result };
+    return { data: (result as any).data };
   }
 
   /**
@@ -802,7 +810,11 @@ Cancela públicos customizados em andamento (status 2).
 **Compatibilidade**: 100% Laravel CampaignsController@put_custom_public
     `,
   })
-  @ApiParam({ name: 'id', description: 'ID do público customizado', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do público customizado',
+    type: Number,
+  })
   @ApiResponse({
     status: 201,
     description: 'Público customizado atualizado',
@@ -1078,7 +1090,11 @@ Retorna informações de um público customizado específico.
 **Compatibilidade**: 100% Laravel CampaignsController@show_simplified_public (reused)
     `,
   })
-  @ApiParam({ name: 'id', description: 'ID do público customizado', type: Number })
+  @ApiParam({
+    name: 'id',
+    description: 'ID do público customizado',
+    type: Number,
+  })
   @ApiResponse({
     status: 200,
     description: 'Público encontrado',

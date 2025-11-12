@@ -40,15 +40,60 @@ export class DashboardService {
       where: { user_id: userId, deleted_at: IsNull(), status: 0 },
     });
 
-    const connectedNumbers = await this.numberRepository.count({
+    const whatsappInstances = await this.numberRepository.count({
+      where: { user_id: userId, deleted_at: IsNull() },
+    });
+
+    const connectedInstances = await this.numberRepository.count({
       where: { user_id: userId, deleted_at: IsNull(), status_connection: 1 },
     });
 
+    // Count total messages sent (sum of total_sent counts from campaigns)
+    const campaigns = await this.campaignRepository.find({
+      where: { user_id: userId, deleted_at: IsNull() },
+      select: ['total_sent'],
+    });
+    const totalMessagesSent = campaigns.reduce(
+      (sum, campaign) => sum + (campaign.total_sent || 0),
+      0,
+    );
+
     return {
-      total_campaigns: totalCampaigns,
       total_contacts: totalContacts,
+      total_campaigns: totalCampaigns,
       active_campaigns: activeCampaigns,
-      connected_numbers: connectedNumbers,
+      total_messages_sent: totalMessagesSent,
+      whatsapp_instances: whatsappInstances,
+      connected_instances: connectedInstances,
+    };
+  }
+
+  /**
+   * Atividade recente do usuário
+   */
+  async getRecentActivity(userId: number, limit?: number) {
+    const take = limit || 10;
+
+    const recentCampaigns = await this.campaignRepository.find({
+      where: { user_id: userId, deleted_at: IsNull() },
+      order: { created_at: 'DESC' },
+      take,
+    });
+
+    const recentContacts = await this.contactRepository.find({
+      where: { user_id: userId, deleted_at: IsNull() },
+      order: { created_at: 'DESC' },
+      take,
+    });
+
+    // For recent messages, we'll return an empty array for now
+    // In production, this would query from a messages/logs table
+    const recentMessages: any[] = [];
+
+    return {
+      recent_campaigns: recentCampaigns,
+      recent_contacts: recentContacts,
+      recent_messages: recentMessages,
     };
   }
 

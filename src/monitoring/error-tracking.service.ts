@@ -15,7 +15,8 @@ export class ErrorTrackingService {
   private readonly logger = new Logger(ErrorTrackingService.name);
 
   // Circuit breaker state
-  private readonly circuitBreakerState: Map<string, CircuitBreakerStats> = new Map();
+  private readonly circuitBreakerState: Map<string, CircuitBreakerStats> =
+    new Map();
   private readonly CIRCUIT_BREAKER_THRESHOLD = 5; // Número de falhas consecutivas
   private readonly CIRCUIT_BREAKER_TIMEOUT = 60000; // 1 minuto
 
@@ -57,7 +58,10 @@ export class ErrorTrackingService {
     } catch (updateError: unknown) {
       this.logger.error('❌ Erro ao atualizar campanha com erro', {
         campaignId,
-        error: updateError instanceof Error ? updateError.message : String(updateError),
+        error:
+          updateError instanceof Error
+            ? updateError.message
+            : String(updateError),
       });
     }
   }
@@ -85,9 +89,12 @@ export class ErrorTrackingService {
         .createQueryBuilder()
         .update(PublicByContact)
         .set({ has_error: 1, send: 0 })
-        .where('contact_id IN (SELECT id FROM contacts WHERE number = :phone)', {
-          phone: contactNumber,
-        })
+        .where(
+          'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
+          {
+            phone: contactNumber,
+          },
+        )
         .execute();
 
       // Track in circuit breaker
@@ -95,7 +102,10 @@ export class ErrorTrackingService {
     } catch (updateError: unknown) {
       this.logger.error('❌ Erro ao atualizar contato com erro', {
         contactNumber,
-        error: updateError instanceof Error ? updateError.message : String(updateError),
+        error:
+          updateError instanceof Error
+            ? updateError.message
+            : String(updateError),
       });
     }
   }

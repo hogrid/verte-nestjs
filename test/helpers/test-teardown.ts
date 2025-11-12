@@ -21,7 +21,7 @@ export async function closeTestConnections(
     }
   } catch (error) {
     // Ignorar erros durante o fechamento para não mascarar erros dos testes
-    console.warn('Warning during test teardown:', error.message);
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('Warning during test teardown:', message);
   }
 }
-

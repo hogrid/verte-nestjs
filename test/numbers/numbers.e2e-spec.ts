@@ -6,6 +6,7 @@ import { AppModule } from '../../src/app.module';
 import { DataSource } from 'typeorm';
 import { User, UserStatus, UserProfile } from '../../src/database/entities';
 import { Number as NumberEntity } from '../../src/database/entities/number.entity';
+import { BadRequestToValidationFilter } from '../../src/common/filters/bad-request-to-validation.filter';
 import * as bcrypt from 'bcryptjs';
 
 /**
@@ -35,6 +36,8 @@ describe('Numbers Module (e2e) - Laravel Compatibility Tests', () => {
     app = moduleFixture.createNestApplication();
 
     useContainer(app.select(AppModule), { fallbackOnErrors: true });
+
+    app.useGlobalFilters(new BadRequestToValidationFilter());
 
     app.useGlobalPipes(
       new ValidationPipe({
@@ -109,13 +112,12 @@ describe('Numbers Module (e2e) - Laravel Compatibility Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(Array.isArray(response.body)).toBe(true);
+      expect(response.body).toHaveProperty('data');
+      expect(Array.isArray(response.body.data)).toBe(true);
     });
 
     it('should reject unauthenticated requests', async () => {
-      await request(app.getHttpServer())
-        .get('/api/v1/numbers')
-        .expect(401);
+      await request(app.getHttpServer()).get('/api/v1/numbers').expect(401);
     });
   });
 
@@ -149,9 +151,11 @@ describe('Numbers Module (e2e) - Laravel Compatibility Tests', () => {
         .post('/api/v1/numbers')
         .set('Authorization', `Bearer ${authToken}`)
         .send({})
-        .expect(400);
+        .expect(422);
 
       expect(response.body).toHaveProperty('message');
+      expect(Array.isArray(response.body.message)).toBe(true);
+      expect(response.body.message.some((msg: string) => msg.includes('instância'))).toBe(true);
     });
 
     it('should reject unauthenticated requests', async () => {
@@ -177,9 +181,10 @@ describe('Numbers Module (e2e) - Laravel Compatibility Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.body).toHaveProperty('id');
-      expect(response.body).toHaveProperty('name');
-      expect(response.body).toHaveProperty('instance');
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('id');
+      expect(response.body.data).toHaveProperty('name');
+      expect(response.body.data).toHaveProperty('instance');
     });
 
     it('should return 404 for non-existent number', async () => {
@@ -243,7 +248,7 @@ describe('Numbers Module (e2e) - Laravel Compatibility Tests', () => {
         .expect(200);
 
       expect(response.body).toHaveProperty('message');
-      expect(response.body.message).toContain('reconexão');
+      expect(response.body.message.toLowerCase()).toContain('reconexão');
     });
 
     it('should return 404 for non-existent number', async () => {

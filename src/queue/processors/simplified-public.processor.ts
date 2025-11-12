@@ -56,7 +56,9 @@ export class SimplifiedPublicProcessor {
   async handleProcessSimplifiedPublic(job: Job<SimplifiedPublicJobData>) {
     const { simplifiedPublicId, userId, campaignId, numberNumber } = job.data;
 
-    this.logger.log(`🚀 Processando público simplificado #${simplifiedPublicId}`);
+    this.logger.log(
+      `🚀 Processando público simplificado #${simplifiedPublicId}`,
+    );
 
     try {
       // 1. Buscar SimplifiedPublic
@@ -65,7 +67,9 @@ export class SimplifiedPublicProcessor {
       });
 
       if (!simplifiedPublic) {
-        this.logger.error(`❌ SimplifiedPublic #${simplifiedPublicId} não encontrado`);
+        this.logger.error(
+          `❌ SimplifiedPublic #${simplifiedPublicId} não encontrado`,
+        );
         return;
       }
 
@@ -85,10 +89,14 @@ export class SimplifiedPublicProcessor {
       // 3. Buscar contatos filtrados
       const filteredContacts = await queryBuilder.getMany();
 
-      this.logger.log(`📋 Encontrados ${filteredContacts.length} contatos para o público simplificado`);
+      this.logger.log(
+        `📋 Encontrados ${filteredContacts.length} contatos para o público simplificado`,
+      );
 
       if (filteredContacts.length === 0) {
-        this.logger.warn(`⚠️ Nenhum contato encontrado com os filtros especificados`);
+        this.logger.warn(
+          `⚠️ Nenhum contato encontrado com os filtros especificados`,
+        );
         // Ainda assim criar o público, mas vazio
       }
 
@@ -128,7 +136,9 @@ export class SimplifiedPublicProcessor {
           .values(publicByContactsData)
           .execute();
 
-        this.logger.log(`✅ Criados ${publicByContactsData.length} registros em PublicByContact`);
+        this.logger.log(
+          `✅ Criados ${publicByContactsData.length} registros em PublicByContact`,
+        );
       }
 
       // 6. Retornar dados para o callback
@@ -137,7 +147,10 @@ export class SimplifiedPublicProcessor {
         totalContacts: filteredContacts.length,
       };
     } catch (error) {
-      this.logger.error(`❌ Erro ao processar público simplificado #${simplifiedPublicId}`, getErrorStack(error));
+      this.logger.error(
+        `❌ Erro ao processar público simplificado #${simplifiedPublicId}`,
+        getErrorStack(error),
+      );
       throw error;
     }
   }

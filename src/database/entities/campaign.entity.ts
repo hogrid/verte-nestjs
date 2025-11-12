@@ -25,7 +25,7 @@ export class Campaign {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: number;
 
-  @Column({ type: 'bigint', unsigned: true, nullable: true })
+  @Column({ type: 'bigint', unsigned: true, nullable: true, default: null })
   public_id: number | null;
 
   @Column({ type: 'bigint', unsigned: true })

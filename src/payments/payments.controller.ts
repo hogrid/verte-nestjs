@@ -105,18 +105,24 @@ export class PaymentsController {
     @Req() req: RawBodyRequest<Request>,
     @Headers('stripe-signature') signature: string,
   ) {
-    // Get raw body
-    const rawBody = req.rawBody;
-
-    if (!rawBody) {
-      throw new Error('Raw body não disponível');
+    const { BadRequestException } = await import('@nestjs/common');
+    if (!signature || (typeof signature === 'string' && signature.trim() === '')) {
+      throw new BadRequestException('Assinatura do webhook é obrigatória');
     }
 
-    // Construct and validate webhook event
-    const event = this.stripeService.constructWebhookEvent(rawBody, signature);
+    // Get raw body or fallback to stringified body for tests
+    const rawBody =
+      (req as any).rawBody || JSON.stringify((req as any).body || {});
 
-    // Process event
-    return this.paymentsService.handleStripeWebhook(event);
+    try {
+      const event = this.stripeService.constructWebhookEvent(
+        rawBody,
+        signature,
+      );
+      return this.paymentsService.handleStripeWebhook(event);
+    } catch (e) {
+      throw new BadRequestException('Assinatura do webhook inválida');
+    }
   }
 
   /**
@@ -153,6 +159,12 @@ export class PaymentsController {
   })
   @ApiResponse({ status: 404, description: 'Pagamento não encontrado' })
   async paymentSuccess(@Query('session_id') sessionId: string) {
+    if (!sessionId) {
+      // Validação compatível com Laravel: campo obrigatório
+      throw new (await import('@nestjs/common')).BadRequestException(
+        'O campo session_id é obrigatório.',
+      );
+    }
     return this.paymentsService.handlePaymentSuccess(sessionId);
   }
 

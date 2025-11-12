@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 import { User, UserStatus, UserProfile } from '../../src/database/entities';
 import { Contact } from '../../src/database/entities/contact.entity';
 import { Campaign } from '../../src/database/entities/campaign.entity';
+import { Public } from '../../src/database/entities/public.entity';
 import * as bcrypt from 'bcryptjs';
 
 /**
@@ -22,9 +23,11 @@ describe('Export Module (e2e) - Laravel Compatibility Tests', () => {
   let dataSource: DataSource;
   let authToken: string;
   let testUser: User;
+  let testPublic: Public;
   let testContact1: Contact;
   let testContact2: Contact;
   let testCampaign: Campaign;
+  let testNumber: any; // Number entity
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -50,6 +53,29 @@ describe('Export Module (e2e) - Laravel Compatibility Tests', () => {
 
     dataSource = app.get(DataSource);
 
+    // Clean up any orphaned data from previous tests
+    const userRepository = dataSource.getRepository(User);
+    const existingUser = await userRepository.findOne({
+      where: { email: 'export-test@verte.com' },
+    });
+
+    if (existingUser) {
+      // Delete contacts first (foreign key constraint)
+      const contactRepository = dataSource.getRepository(Contact);
+      await contactRepository.delete({ user_id: existingUser.id });
+
+      const campaignRepository = dataSource.getRepository(Campaign);
+      await campaignRepository.delete({ user_id: existingUser.id });
+
+      const publicRepository = dataSource.getRepository(Public);
+      await publicRepository.delete({ user_id: existingUser.id });
+
+      const numberRepository = dataSource.getRepository('numbers');
+      await numberRepository.delete({ user_id: existingUser.id });
+
+      await userRepository.delete({ id: existingUser.id });
+    }
+
     await createTestUser();
     await loginTestUser();
     await createTestData();
@@ -62,6 +88,9 @@ describe('Export Module (e2e) - Laravel Compatibility Tests', () => {
 
       const campaignRepository = dataSource.getRepository(Campaign);
       await campaignRepository.delete({ user_id: testUser.id });
+
+      const publicRepository = dataSource.getRepository(Public);
+      await publicRepository.delete({ user_id: testUser.id });
 
       const numberRepository = dataSource.getRepository('numbers');
       await numberRepository.delete({ user_id: testUser.id });
@@ -104,33 +133,58 @@ describe('Export Module (e2e) - Laravel Compatibility Tests', () => {
   }
 
   async function createTestData() {
+    // Create a number first (required for campaign)
+    const numberRepository = dataSource.getRepository('numbers');
+    testNumber = numberRepository.create({
+      user_id: testUser.id,
+      name: 'Número Teste Export',
+      instance: 'instance-export-test', // Laravel requires instance field
+      status: 1,
+      status_connection: 1,
+    });
+    testNumber = await numberRepository.save(testNumber);
+
+    // Create a public
+    const publicRepository = dataSource.getRepository(Public);
+    testPublic = publicRepository.create({
+      user_id: testUser.id,
+      name: 'Público de Teste Export',
+      status: 0,
+    });
+    testPublic = await publicRepository.save(testPublic);
+
     const contactRepository = dataSource.getRepository(Contact);
 
     testContact1 = contactRepository.create({
       user_id: testUser.id,
+      public_id: testPublic.id,
       name: 'João Silva',
       number: '5511999999999',
       cel_owner: 'joao@email.com',
       labels: 'cliente-vip',
       status: 1,
+      created_at: new Date(), // Explicit timestamp for testing
     });
     testContact1 = await contactRepository.save(testContact1);
 
     testContact2 = contactRepository.create({
       user_id: testUser.id,
+      public_id: testPublic.id,
       name: 'Maria Santos',
       number: '5511988888888',
       cel_owner: 'maria@email.com',
       labels: 'prospect',
       status: 0,
+      created_at: new Date(), // Explicit timestamp for testing
     });
     testContact2 = await contactRepository.save(testContact2);
 
-    // Create campaign
+    // Create campaign (requires public_id and number_id)
     const campaignRepository = dataSource.getRepository(Campaign);
     testCampaign = campaignRepository.create({
       user_id: testUser.id,
-      number_id: 1,
+      public_id: testPublic.id, // Laravel requires public_id
+      number_id: testNumber.id, // Laravel requires valid number_id
       name: 'Campanha Teste Export',
       status: 0,
       total_contacts: 100,
@@ -158,7 +212,9 @@ describe('Export Module (e2e) - Laravel Compatibility Tests', () => {
 
       // Validate CSV content
       const csvContent = response.text;
-      expect(csvContent).toContain('ID,Nome,Telefone,Responsável,Etiquetas,Status,Criado em');
+      expect(csvContent).toContain(
+        'ID,Nome,Telefone,Responsável,Etiquetas,Status,Criado em',
+      );
       expect(csvContent).toContain('João Silva');
       expect(csvContent).toContain('Maria Santos');
 

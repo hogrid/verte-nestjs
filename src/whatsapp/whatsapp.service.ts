@@ -257,7 +257,8 @@ export class WhatsappService {
         throw new NotFoundException('Sessão não encontrada');
       }
 
-      const sessionStatus = await this.wahaService.getSessionStatus(sessionName);
+      const sessionStatus =
+        await this.wahaService.getSessionStatus(sessionName);
 
       return {
         ...sessionStatus,
@@ -493,7 +494,7 @@ export class WhatsappService {
         };
       }
 
-      const event = payload as WahaWebhookEvent;
+      const event = payload;
 
       this.logger.log('📥 Webhook WAHA recebido', {
         event: event.event,
@@ -600,23 +601,64 @@ export class WhatsappService {
           break;
       }
 
-      // Atualizar MessageByContact (buscar por número do destinatário)
+      // Atualizar MessageByContact (buscar pelo contact_id do número destinatário)
       const phoneNumber = this.extractPhoneNumber(payload.to);
       if (phoneNumber) {
-        await this.messageByContactRepository.update(
-          { number: phoneNumber },
-          updates,
+        // Atualizar somente colunas existentes no schema atual
+        const [{ db }]: any = await this.messageByContactRepository.query(
+          'SELECT DATABASE() AS db',
+        );
+        const canSetSend = await this.hasColumn(
+          db,
+          'message_by_contacts',
+          'send',
+        );
+        const canSetDelivered = await this.hasColumn(
+          db,
+          'message_by_contacts',
+          'delivered',
+        );
+        const canSetRead = await this.hasColumn(
+          db,
+          'message_by_contacts',
+          'read',
         );
 
+        const safeUpdates: Partial<MessageByContact> = {};
+        if (canSetSend && typeof updates.send !== 'undefined')
+          safeUpdates.send = updates.send;
+        if (canSetDelivered && typeof updates.delivered !== 'undefined')
+          safeUpdates.delivered = updates.delivered;
+        if (canSetRead && typeof updates.read !== 'undefined')
+          safeUpdates.read = updates.read;
+
+        if (Object.keys(safeUpdates).length > 0) {
+          await this.messageByContactRepository
+            .createQueryBuilder()
+            .update(MessageByContact)
+            .set(safeUpdates)
+            .where(
+              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
+              { phone: phoneNumber },
+            )
+            .execute();
+        }
+
         // Atualizar PublicByContact se mensagem foi lida
-        if (payload.ack === MessageAckStatus.READ || payload.ack === MessageAckStatus.PLAYED) {
+        if (
+          payload.ack === MessageAckStatus.READ ||
+          payload.ack === MessageAckStatus.PLAYED
+        ) {
           await this.publicByContactRepository
             .createQueryBuilder()
             .update(PublicByContact)
             .set({ read: 1 })
-            .where('contact_id IN (SELECT id FROM contacts WHERE number = :phone)', {
-              phone: phoneNumber,
-            })
+            .where(
+              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
+              {
+                phone: phoneNumber,
+              },
+            )
             .execute();
         }
       }
@@ -648,21 +690,67 @@ export class WhatsappService {
 
       const phoneNumber = this.extractPhoneNumber(payload.to);
       if (phoneNumber) {
-        // Atualizar MessageByContact
-        await this.messageByContactRepository.update(
-          { number: phoneNumber },
-          { send: 1 },
+        // Atualizar MessageByContact (se coluna existir)
+        const [{ db }]: any = await this.messageByContactRepository.query(
+          'SELECT DATABASE() AS db',
         );
+        const canSetSend = await this.hasColumn(
+          db,
+          'message_by_contacts',
+          'send',
+        );
+        if (canSetSend) {
+          try {
+            await this.messageByContactRepository
+              .createQueryBuilder()
+              .update('message_by_contacts')
+              .set({ send: 1 } as any)
+              .where(
+                'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
+                { phone: phoneNumber },
+              )
+              .execute();
+          } catch (e) {
+            this.logger.warn('⚠️ Não foi possível marcar send=1 (coluna ausente?)');
+          }
+        }
 
-        // Atualizar PublicByContact
-        await this.publicByContactRepository
-          .createQueryBuilder()
-          .update(PublicByContact)
-          .set({ send: 1, has_error: 0 })
-          .where('contact_id IN (SELECT id FROM contacts WHERE number = :phone)', {
-            phone: phoneNumber,
-          })
-          .execute();
+        // Atualizar PublicByContact (somente colunas existentes)
+        try {
+          const [{ db }]: any = await this.publicByContactRepository.query(
+            'SELECT DATABASE() AS db',
+          );
+          const canSetPbcSend = await this.hasColumn(
+            db,
+            'public_by_contacts',
+            'send',
+          );
+          const canSetPbcHasError = await this.hasColumn(
+            db,
+            'public_by_contacts',
+            'has_error',
+          );
+          const pbcUpdates: any = {};
+          if (canSetPbcSend) pbcUpdates.send = 1;
+          if (canSetPbcHasError) pbcUpdates.has_error = 0;
+          if (Object.keys(pbcUpdates).length > 0) {
+            await this.publicByContactRepository
+              .createQueryBuilder()
+              .update('public_by_contacts')
+              .set(pbcUpdates)
+              .where(
+                'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
+                {
+                  phone: phoneNumber,
+                },
+              )
+              .execute();
+          }
+        } catch (e) {
+          this.logger.warn(
+            '⚠️ Não foi possível atualizar public_by_contacts (colunas ausentes?)',
+          );
+        }
       }
 
       this.logger.log('✅ message.sent processado', { phone: phoneNumber });
@@ -719,5 +807,18 @@ export class WhatsappService {
     const cleaned = wahaPhone.replace(/@.*$/, '');
 
     return cleaned;
+  }
+
+  // Helper: verifica se coluna existe no schema atual (compat MySQL/MariaDB)
+  private async hasColumn(
+    dbName: string,
+    table: string,
+    column: string,
+  ): Promise<boolean> {
+    const rows = await this.messageByContactRepository.query(
+      'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1',
+      [dbName, table, column],
+    );
+    return Array.isArray(rows) && rows.length > 0;
   }
 }

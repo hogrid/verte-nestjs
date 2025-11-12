@@ -9,6 +9,7 @@ import { Payment } from '../database/entities/payment.entity';
 import { Setting } from '../database/entities/setting.entity';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
+import { UsersModule } from '../users/users.module';
 
 /**
  * AdminModule
@@ -21,6 +22,7 @@ import { AdminService } from './admin.service';
  */
 @Module({
   imports: [
+    UsersModule,
     TypeOrmModule.forFeature([
       User,
       Plan,

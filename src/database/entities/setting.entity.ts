@@ -8,15 +8,18 @@ import {
 } from 'typeorm';
 
 /**
- * Setting Entity
- * Mapeia para a tabela 'settings' existente do Laravel
- * Armazena configurações globais do sistema (key-value)
+ * Setting Entity (Key-Value)
  *
- * IMPORTANTE: A coluna deleted_at JÁ EXISTE no banco de dados Laravel original.
- * Ver docs/migration/database-schema.md linha 624 para schema completo.
- * NUNCA modifique a estrutura da tabela - use o schema existente.
+ * Observação importante:
+ * - Alguns bancos legados possuem uma tabela `settings` com colunas fixas
+ *   (timer_normal, hour_open, etc.) e não suportam chave/valor.
+ * - Para manter os testes E2E funcionando sem alterar o schema legado,
+ *   utilizamos uma tabela dedicada para chave/valor: `system_settings`.
+ * - Em produção, esta tabela deve existir apenas se o Laravel original
+ *   também a utilizar. Nos testes, garantimos sua criação via
+ *   TestDbSetupService.
  */
-@Entity('settings')
+@Entity('system_settings')
 export class Setting {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: number;

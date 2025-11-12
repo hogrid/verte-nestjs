@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsArray } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 /**
  * ExportContactsDto
@@ -15,6 +16,14 @@ export class ExportContactsDto {
   })
   @IsOptional()
   @IsArray()
+  @Transform(({ value }) => {
+    // Handle query string: "1" or "1,2,3" -> [1, 2, 3]
+    if (typeof value === 'string') {
+      return value.split(',').map((id) => parseInt(id.trim(), 10));
+    }
+    // Already an array
+    return value;
+  })
   contact_ids?: number[];
 
   @ApiPropertyOptional({
@@ -27,12 +36,21 @@ export class ExportContactsDto {
   label?: string;
 
   @ApiPropertyOptional({
-    description: 'Filtrar por status (active, blocked)',
+    description: 'Filtrar por status (active, blocked, 1, 0)',
     example: 'active',
-    enum: ['active', 'blocked'],
+    enum: ['active', 'blocked', '1', '0', 1, 0],
   })
   @IsOptional()
-  @IsString()
+  @Transform(({ value }) => {
+    // Convert number to string for validation
+    if (typeof value === 'number') {
+      return value === 1 ? 'active' : 'blocked';
+    }
+    // Convert string numbers to active/blocked
+    if (value === '1') return 'active';
+    if (value === '0') return 'blocked';
+    return value;
+  })
   status?: string;
 
   @ApiPropertyOptional({

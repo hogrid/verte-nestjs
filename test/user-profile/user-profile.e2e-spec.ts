@@ -124,9 +124,7 @@ describe('User Profile Module (e2e) - Laravel Compatibility Tests', () => {
     });
 
     it('should reject unauthenticated requests', async () => {
-      await request(app.getHttpServer())
-        .get('/api/v1/profile')
-        .expect(401);
+      await request(app.getHttpServer()).get('/api/v1/profile').expect(401);
     });
   });
 
@@ -218,8 +216,25 @@ describe('User Profile Module (e2e) - Laravel Compatibility Tests', () => {
     });
 
     it('should validate email uniqueness if trying to change', async () => {
-      // Create another user
       const userRepository = dataSource.getRepository(User);
+      const numberRepository = dataSource.getRepository('numbers');
+
+      // Cleanup any existing user with this email (from previous failed runs)
+      const existingUser = await userRepository.findOne({
+        where: { email: 'another@verte.com' },
+        withDeleted: true,
+      });
+      if (existingUser) {
+        await numberRepository.delete({ user_id: existingUser.id });
+        await dataSource
+          .createQueryBuilder()
+          .delete()
+          .from(User)
+          .where('id = :id', { id: existingUser.id })
+          .execute();
+      }
+
+      // Create another user
       const anotherUser = userRepository.create({
         name: 'Another',
         email: 'another@verte.com',
@@ -244,10 +259,14 @@ describe('User Profile Module (e2e) - Laravel Compatibility Tests', () => {
 
       expect(response.body).toHaveProperty('message');
 
-      // Cleanup
-      const numberRepository = dataSource.getRepository('numbers');
+      // Cleanup - hard delete to avoid unique constraint issues
       await numberRepository.delete({ user_id: anotherUser.id });
-      await userRepository.delete({ id: anotherUser.id });
+      await dataSource
+        .createQueryBuilder()
+        .delete()
+        .from(User)
+        .where('id = :id', { id: anotherUser.id })
+        .execute();
     });
 
     it('should reject unauthenticated requests', async () => {

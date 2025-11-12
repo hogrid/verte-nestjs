@@ -60,12 +60,19 @@ export class TemplatesService {
     query.orderBy('template.created_at', 'DESC');
 
     // Paginação
-    const [data, total] = await query.skip(skip).take(perPage).getManyAndCount();
+    const [data, total] = await query
+      .skip(skip)
+      .take(perPage)
+      .getManyAndCount();
 
     // Processar variáveis JSON para array
     const templates = data.map((template) => ({
       ...template,
-      variables: template.variables ? JSON.parse(template.variables as string) : [],
+      variables: template.variables
+        ? typeof template.variables === 'string'
+          ? JSON.parse(template.variables)
+          : (template.variables as unknown as string[])
+        : [],
     }));
 
     return {
@@ -100,7 +107,11 @@ export class TemplatesService {
     // Processar variáveis JSON para array
     return {
       ...template,
-      variables: template.variables ? JSON.parse(template.variables as string) : [],
+      variables: template.variables
+        ? typeof template.variables === 'string'
+          ? JSON.parse(template.variables)
+          : (template.variables as unknown as string[])
+        : [],
     };
   }
 
@@ -162,7 +173,11 @@ export class TemplatesService {
 
     return {
       ...updated,
-      variables: updated.variables ? JSON.parse(updated.variables as string) : [],
+      variables: updated.variables
+        ? typeof updated.variables === 'string'
+          ? JSON.parse(updated.variables)
+          : (updated.variables as unknown as string[])
+        : [],
     };
   }
 

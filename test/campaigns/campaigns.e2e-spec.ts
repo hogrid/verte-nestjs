@@ -135,10 +135,18 @@ describe('CampaignsController (e2e) - COMPLETO', () => {
     await dataSource.query(
       `DELETE FROM message_by_contacts WHERE user_id = ${testUserId}`,
     );
-    await dataSource.query(`DELETE FROM messages WHERE user_id = ${testUserId}`);
+    await dataSource.query(
+      `DELETE FROM messages WHERE user_id = ${testUserId}`,
+    );
     await dataSource.query(
       `DELETE FROM campaigns WHERE user_id = ${testUserId}`,
     );
+    // Tabelas com FKs para numbers
+    try {
+      await dataSource.query(
+        `DELETE FROM custom_publics WHERE user_id = ${testUserId}`,
+      );
+    } catch {}
     await dataSource.query(
       `DELETE FROM contacts WHERE user_id = ${testUserId}`,
     );

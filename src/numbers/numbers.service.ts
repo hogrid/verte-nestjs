@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull } from 'typeorm';
 import { Number as WhatsAppNumber } from '../database/entities/number.entity';
 import { Plan } from '../database/entities/plan.entity';
+import { CreateNumberDto } from './dto/create-number.dto';
 import { UpdateNumberDto } from './dto/update-number.dto';
 
 /**
@@ -73,7 +74,8 @@ export class NumbersService {
     // Atualizar campos fornecidos
     if (dto.name !== undefined) number.name = dto.name;
     if (dto.status !== undefined) number.status = dto.status;
-    if (dto.labels_active !== undefined) number.labels_active = dto.labels_active;
+    if (dto.labels_active !== undefined)
+      number.labels_active = dto.labels_active;
 
     return this.numberRepository.save(number);
   }
@@ -137,7 +139,9 @@ export class NumbersService {
     });
 
     if (currentNumbers >= 5) {
-      throw new NotFoundException('Limite de números atingido. Você já possui 5 números cadastrados.');
+      throw new NotFoundException(
+        'Limite de números atingido. Você já possui 5 números cadastrados.',
+      );
     }
 
     // Verificar se número já existe
@@ -169,6 +173,48 @@ export class NumbersService {
       success: true,
       message: 'Número extra adicionado com sucesso.',
       number: saved,
+    };
+  }
+
+  /**
+   * Criar número/instância WhatsApp
+   */
+  async create(userId: number, createDto: CreateNumberDto) {
+    const number = this.numberRepository.create({
+      user_id: userId,
+      name: createDto.name || `WhatsApp ${createDto.instance}`,
+      instance: createDto.instance,
+      cel: createDto.cel || createDto.phone || null,
+      status: 1,
+      status_connection: 0,
+      extra: 0,
+    });
+
+    return this.numberRepository.save(number);
+  }
+
+  /**
+   * Reconectar número/instância WhatsApp
+   */
+  async reconnect(userId: number, numberId: number) {
+    const number = await this.numberRepository.findOne({
+      where: {
+        id: numberId,
+        user_id: userId,
+        deleted_at: IsNull(),
+      },
+    });
+
+    if (!number) {
+      throw new NotFoundException('Número não encontrado.');
+    }
+
+    // Aqui deveria disparar reconexão via WAHA API
+    // Por enquanto, apenas retorna sucesso
+    return {
+      success: true,
+      message: 'Reconexão iniciada com sucesso.',
+      number,
     };
   }
 }

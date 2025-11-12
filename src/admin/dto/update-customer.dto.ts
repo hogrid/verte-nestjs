@@ -24,7 +24,9 @@ export class UpdateCustomerDto {
   })
   @IsOptional()
   @IsString({ message: 'O campo nome deve ser uma string.' })
-  @MaxLength(255, { message: 'O campo nome deve ter no máximo 255 caracteres.' })
+  @MaxLength(255, {
+    message: 'O campo nome deve ter no máximo 255 caracteres.',
+  })
   name?: string;
 
   @ApiPropertyOptional({
@@ -89,7 +91,9 @@ export class UpdateCustomerDto {
     enum: UserStatus,
   })
   @IsOptional()
-  @IsEnum(UserStatus, { message: 'O campo status deve ser "actived" ou "inactived".' })
+  @IsEnum(UserStatus, {
+    message: 'O campo status deve ser "actived" ou "inactived".',
+  })
   status?: UserStatus;
 
   @ApiPropertyOptional({

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, IsArray } from 'class-validator';
+import { IsOptional, IsString, IsInt } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -20,13 +20,13 @@ export class ListSimplifiedPublicDto {
   public_id?: number;
 
   @ApiPropertyOptional({
-    description: 'Etiquetas para filtrar contatos (apenas quando PROJECT == verte)',
+    description:
+      'Etiquetas para filtrar contatos. Aceita array JSON (e.g. ["VIP"]) ou string.',
     example: ['VIP', 'Cliente'],
     type: [String],
   })
   @IsOptional()
-  @IsArray()
-  labels?: string[];
+  labels?: any;
 
   @ApiPropertyOptional({
     description: 'Termo de busca (nome ou número)',

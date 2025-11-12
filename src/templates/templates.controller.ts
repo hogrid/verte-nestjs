@@ -52,16 +52,34 @@ export class TemplatesController {
     description:
       'Retorna templates do usuário autenticado com filtros opcionais (busca, categoria, status) e paginação',
   })
-  @ApiQuery({ name: 'search', required: false, description: 'Buscar por nome ou conteúdo' })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Buscar por nome ou conteúdo',
+  })
   @ApiQuery({
     name: 'category',
     required: false,
     enum: ['marketing', 'support', 'notification', 'sales', 'other'],
     description: 'Filtrar por categoria',
   })
-  @ApiQuery({ name: 'active', required: false, description: 'Filtrar por status (1 ou 0)' })
-  @ApiQuery({ name: 'page', required: false, description: 'Página atual', example: 1 })
-  @ApiQuery({ name: 'per_page', required: false, description: 'Itens por página', example: 15 })
+  @ApiQuery({
+    name: 'active',
+    required: false,
+    description: 'Filtrar por status (1 ou 0)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Página atual',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'per_page',
+    required: false,
+    description: 'Itens por página',
+    example: 15,
+  })
   @ApiResponse({
     status: 200,
     description: 'Templates listados com sucesso',
@@ -96,7 +114,9 @@ export class TemplatesController {
     @Request() req: { user: { id: number } },
     @Query() dto: ListTemplatesDto,
   ) {
-    return this.templatesService.findAll(req.user.id, dto);
+    const result = await this.templatesService.findAll(req.user.id, dto);
+    // Return only the data array for Laravel compatibility
+    return result.data;
   }
 
   /**
@@ -143,7 +163,8 @@ export class TemplatesController {
   @Put('message-templates/:id')
   @ApiOperation({
     summary: 'Atualizar template de mensagem',
-    description: 'Atualiza template existente. Variáveis são extraídas automaticamente do conteúdo.',
+    description:
+      'Atualiza template existente. Variáveis são extraídas automaticamente do conteúdo.',
   })
   @ApiParam({
     name: 'id',

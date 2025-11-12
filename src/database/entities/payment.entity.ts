@@ -16,9 +16,11 @@ import { Plan } from './plan.entity';
  * Mapeia para a tabela 'payments' existente do Laravel
  * Registra transações de pagamento (Stripe, MercadoPago)
  *
- * IMPORTANTE: A coluna deleted_at JÁ EXISTE no banco de dados Laravel original.
- * Ver docs/migration/database-schema.md linha 513 para schema completo.
- * NUNCA modifique a estrutura da tabela - use o schema existente.
+ * Schema Laravel Real (CreatePaymentsTable migration):
+ * - id, user_id, plan_id, status, payment_id, from, amount, extra_number
+ * - timestamps, soft deletes
+ *
+ * IMPORTANTE: Usar APENAS as colunas que existem no Laravel!
  */
 @Entity('payments')
 export class Payment {
@@ -28,32 +30,23 @@ export class Payment {
   @Column({ type: 'bigint', unsigned: true })
   user_id: number;
 
-  @Column({ type: 'bigint', unsigned: true, nullable: true })
-  plan_id: number | null;
+  @Column({ type: 'bigint', unsigned: true })
+  plan_id: number;
 
-  @Column({ type: 'varchar', length: 50 })
-  provider: string; // 'stripe'
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  status: string | null; // Laravel: string with default 0
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  provider_payment_id: string | null; // Stripe Payment Intent ID
+  @Column({ type: 'varchar', length: 150, nullable: true })
+  payment_id: string | null; // Stripe session/payment ID
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  provider_session_id: string | null; // Stripe Checkout Session ID
+  @Column({ type: 'varchar', length: 80, nullable: true })
+  from: string | null; // Payment provider (stripe, mercadopago, etc)
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'float', precision: 8, scale: 2, default: 0 })
   amount: number;
 
-  @Column({ type: 'varchar', length: 10, default: 'BRL' })
-  currency: string;
-
-  @Column({ type: 'varchar', length: 50 })
-  status: string; // pending, succeeded, failed, canceled
-
-  @Column({ type: 'text', nullable: true })
-  metadata: string | null; // JSON com dados extras
-
-  @Column({ type: 'timestamp', nullable: true })
-  paid_at: Date | null;
+  @Column({ type: 'tinyint', default: 0, nullable: true })
+  extra_number: number | null; // Additional number flag
 
   @CreateDateColumn()
   created_at: Date;

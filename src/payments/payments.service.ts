@@ -32,10 +32,7 @@ export class PaymentsService {
    * Create checkout session
    * Laravel: PaymentsController@createCheckoutSession
    */
-  async createCheckoutSession(
-    userId: number,
-    dto: CreateCheckoutSessionDto,
-  ) {
+  async createCheckoutSession(userId: number, dto: CreateCheckoutSessionDto) {
     this.logger.log('🛒 Criando sessão de checkout', {
       userId,
       planId: dto.plan_id,
@@ -63,7 +60,8 @@ export class PaymentsService {
       // Default URLs
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
       const successUrl =
-        dto.success_url || `${frontendUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
+        dto.success_url ||
+        `${frontendUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`;
       const cancelUrl = dto.cancel_url || `${frontendUrl}/payment-cancel`;
 
       // Create Stripe checkout session
@@ -78,35 +76,36 @@ export class PaymentsService {
       });
 
       // Create payment record (pending)
+      // Laravel schema: user_id, plan_id, status, payment_id, from, amount, extra_number
       const payment = this.paymentRepository.create({
         user_id: userId,
         plan_id: plan.id,
-        provider: 'stripe',
-        provider_session_id: session.id,
-        amount: Number(plan.value),
-        currency: 'BRL',
         status: 'pending',
-        metadata: JSON.stringify({
-          plan_name: plan.name,
-          session_url: session.url,
-        }),
+        payment_id: session.id, // Stripe session ID
+        from: 'stripe', // Payment provider
+        amount: Number(plan.value),
+        extra_number: 0,
       });
 
-      await this.paymentRepository.save(payment);
+      const savedPayment = await this.paymentRepository.save(payment);
 
       this.logger.log('✅ Checkout session criada', {
         sessionId: session.id,
-        paymentId: payment.id,
+        paymentId: savedPayment.id,
       });
 
-      return {
+      const result = {
         session_id: session.id,
         url: session.url,
-        payment_id: payment.id,
+        payment_id: savedPayment.id,
       };
+
+      this.logger.log('✅ Retornando resultado', result);
+      return result;
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao criar checkout session', {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
     }
@@ -125,21 +124,15 @@ export class PaymentsService {
     try {
       switch (event.type) {
         case 'checkout.session.completed':
-          await this.handleCheckoutSessionCompleted(
-            event.data.object as Stripe.Checkout.Session,
-          );
+          await this.handleCheckoutSessionCompleted(event.data.object);
           break;
 
         case 'payment_intent.succeeded':
-          await this.handlePaymentIntentSucceeded(
-            event.data.object as Stripe.PaymentIntent,
-          );
+          await this.handlePaymentIntentSucceeded(event.data.object);
           break;
 
         case 'payment_intent.payment_failed':
-          await this.handlePaymentIntentFailed(
-            event.data.object as Stripe.PaymentIntent,
-          );
+          await this.handlePaymentIntentFailed(event.data.object);
           break;
 
         default:
@@ -167,9 +160,9 @@ export class PaymentsService {
     });
 
     try {
-      // Find payment by session ID
+      // Find payment by session ID (stored in payment_id)
       const payment = await this.paymentRepository.findOne({
-        where: { provider_session_id: session.id },
+        where: { payment_id: session.id },
       });
 
       if (!payment) {
@@ -179,11 +172,9 @@ export class PaymentsService {
         return;
       }
 
-      // Update payment
+      // Update payment status
       await this.paymentRepository.update(payment.id, {
         status: session.payment_status === 'paid' ? 'succeeded' : 'pending',
-        provider_payment_id: session.payment_intent as string,
-        paid_at: session.payment_status === 'paid' ? new Date() : null,
       });
 
       // If paid, update user plan
@@ -216,9 +207,9 @@ export class PaymentsService {
     });
 
     try {
-      // Find payment by payment intent ID
+      // Find payment by payment intent ID (stored in payment_id if available)
       const payment = await this.paymentRepository.findOne({
-        where: { provider_payment_id: paymentIntent.id },
+        where: { payment_id: paymentIntent.id },
       });
 
       if (!payment) {
@@ -231,7 +222,6 @@ export class PaymentsService {
       // Update payment status
       await this.paymentRepository.update(payment.id, {
         status: 'succeeded',
-        paid_at: new Date(),
       });
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar payment succeeded', {
@@ -249,9 +239,9 @@ export class PaymentsService {
     });
 
     try {
-      // Find payment by payment intent ID
+      // Find payment by payment intent ID (stored in payment_id if available)
       const payment = await this.paymentRepository.findOne({
-        where: { provider_payment_id: paymentIntent.id },
+        where: { payment_id: paymentIntent.id },
       });
 
       if (!payment) {
@@ -284,9 +274,9 @@ export class PaymentsService {
       const session =
         await this.stripeService.retrieveCheckoutSession(sessionId);
 
-      // Find payment
+      // Find payment by session ID (stored in payment_id)
       const payment = await this.paymentRepository.findOne({
-        where: { provider_session_id: sessionId },
+        where: { payment_id: sessionId },
         relations: ['user', 'plan'],
       });
 
@@ -323,9 +313,9 @@ export class PaymentsService {
 
     try {
       if (sessionId) {
-        // Find and update payment
+        // Find and update payment by session ID (stored in payment_id)
         const payment = await this.paymentRepository.findOne({
-          where: { provider_session_id: sessionId },
+          where: { payment_id: sessionId },
         });
 
         if (payment) {

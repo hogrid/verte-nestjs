@@ -1,7 +1,12 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { redisConfig, QUEUE_NAMES, bullDefaultJobOptions } from '../config/redis.config';
+import {
+  redisConfig,
+  QUEUE_NAMES,
+  bullDefaultJobOptions,
+  createMockQueueProviders,
+} from '../config/redis.config';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { MonitoringModule } from '../monitoring/monitoring.module';
 
@@ -37,9 +42,13 @@ import { Public } from '../database/entities/public.entity';
  * - Remoção automática de jobs completados
  * - Persistência de jobs falhados para debug
  */
+const isMock = process.env.MOCK_BULL === '1';
+const mockProviders = isMock
+  ? (createMockQueueProviders() as any)
+  : ([] as any);
+
 @Module({
   imports: [
-    // TypeORM entities
     TypeOrmModule.forFeature([
       Campaign,
       PublicByContact,
@@ -50,36 +59,40 @@ import { Public } from '../database/entities/public.entity';
       Contact,
       Public,
     ]),
-    // Configuração global do Bull
-    BullModule.forRoot({
-      redis: redisConfig,
-      defaultJobOptions: bullDefaultJobOptions,
-    }),
-    // Registro das queues principais
-    BullModule.registerQueue(
-      { name: QUEUE_NAMES.CAMPAIGNS },
-      { name: QUEUE_NAMES.SIMPLIFIED_PUBLIC },
-      { name: QUEUE_NAMES.CUSTOM_PUBLIC },
-      { name: QUEUE_NAMES.WHATSAPP_MESSAGE },
-    ),
-    // Registro das Dead Letter Queues
-    BullModule.registerQueue(
-      { name: QUEUE_NAMES.CAMPAIGNS_DLQ },
-      { name: QUEUE_NAMES.SIMPLIFIED_PUBLIC_DLQ },
-      { name: QUEUE_NAMES.CUSTOM_PUBLIC_DLQ },
-      { name: QUEUE_NAMES.WHATSAPP_MESSAGE_DLQ },
-    ),
-    // WhatsApp module for WAHA service
+    ...(isMock
+      ? []
+      : [
+          BullModule.forRoot({
+            redis: redisConfig,
+            defaultJobOptions: bullDefaultJobOptions,
+          }),
+          BullModule.registerQueue(
+            { name: QUEUE_NAMES.CAMPAIGNS },
+            { name: QUEUE_NAMES.SIMPLIFIED_PUBLIC },
+            { name: QUEUE_NAMES.CUSTOM_PUBLIC },
+            { name: QUEUE_NAMES.WHATSAPP_MESSAGE },
+          ),
+          BullModule.registerQueue(
+            { name: QUEUE_NAMES.CAMPAIGNS_DLQ },
+            { name: QUEUE_NAMES.SIMPLIFIED_PUBLIC_DLQ },
+            { name: QUEUE_NAMES.CUSTOM_PUBLIC_DLQ },
+            { name: QUEUE_NAMES.WHATSAPP_MESSAGE_DLQ },
+          ),
+        ]),
     WhatsappModule,
-    // Monitoring module for error tracking
     MonitoringModule,
   ],
   providers: [
-    CampaignsProcessor,
-    SimplifiedPublicProcessor,
-    CustomPublicProcessor,
-    WhatsappMessageProcessor,
+    ...(isMock
+      ? ([] as any)
+      : [
+          CampaignsProcessor,
+          SimplifiedPublicProcessor,
+          CustomPublicProcessor,
+          WhatsappMessageProcessor,
+        ]),
+    ...mockProviders,
   ],
-  exports: [BullModule],
+  exports: [...(isMock ? mockProviders : [BullModule])],
 })
 export class QueueModule {}
