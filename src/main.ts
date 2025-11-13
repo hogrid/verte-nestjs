@@ -26,7 +26,7 @@ async function bootstrap() {
     origin: true, // Allow all origins for development
     credentials: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: 'Content-Type,Accept,Authorization',
+    allowedHeaders: 'Content-Type,Accept,Authorization,X-Requested-With',
   });
 
   // Global Exception Filters (Laravel-compatible validation errors)
