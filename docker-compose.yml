@@ -1,0 +1,141 @@
+networks:
+  VerteApp:
+    driver: bridge
+    name: VerteApp
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  waha_data:
+    driver: local
+
+services:
+  # =========================================
+  # NestJS API (substitui Laravel)
+  # =========================================
+  api:
+    container_name: "verte_nestjs_api"
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - VerteApp
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      waha:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=mysql
+      - REDIS_HOST=redis
+      - WAHA_URL=http://waha:8080
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/v1/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =========================================
+  # MySQL/MariaDB (compartilhado com Laravel)
+  # =========================================
+  mysql:
+    container_name: "verte_db"
+    image: mariadb:lts
+    ports:
+      - "5306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - VerteApp
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_PASSWORD:-yPiS83D8iN}
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "no"
+      MARIADB_DATABASE: ${DB_DATABASE:-VerteApp}
+      MARIADB_USER: ${DB_USERNAME:-root}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # =========================================
+  # PHPMyAdmin (gerenciamento de banco)
+  # =========================================
+  phpmyadmin:
+    container_name: verte_dbadmin
+    depends_on:
+      - mysql
+    image: phpmyadmin
+    restart: always
+    ports:
+      - "8888:80"
+    networks:
+      - VerteApp
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: ${DB_USERNAME:-root}
+      PMA_PASSWORD: ${DB_PASSWORD:-yPiS83D8iN}
+
+  # =========================================
+  # Redis (Cache + Bull Queue)
+  # =========================================
+  redis:
+    container_name: verte_redis
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - VerteApp
+    command: redis-server --save 20 1 --loglevel warning
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =========================================
+  # WAHA (WhatsApp HTTP API)
+  # =========================================
+  waha:
+    container_name: verte_waha
+    image: devlikeapro/waha:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - VerteApp
+    environment:
+      - WHATSAPP_API_PORT=8080
+      - WHATSAPP_API_HOSTNAME=0.0.0.0
+      - WAHA_DEBUG_MODE=false
+      - TZ=America/Sao_Paulo
+      # Para multi-sessão WAHA Plus, adicione:
+      # - WHATSAPP_START_SESSION=session1,session2,session3
+    volumes:
+      - waha_data:/app/.media
+    expose:
+      - 8080
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
