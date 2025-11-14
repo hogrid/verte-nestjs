@@ -126,7 +126,7 @@ npm run validate:full
 - ✅ CRUD completo de todos os recursos
 - ✅ Validações em português
 - ✅ Soft deletes
-- ✅ Integrações (Stripe, WAHA)
+- ✅ Integrações (Stripe, Evolution API)
 - ✅ Upload/Download de arquivos
 - ✅ Paginação estilo Laravel
 - ✅ Webhooks e callbacks
@@ -159,7 +159,7 @@ src/
 ├── publics/           # Públicos-alvo (6 endpoints)
 ├── campaigns/         # Campanhas (16 endpoints)
 ├── templates/         # Templates de mensagens (4 endpoints)
-├── whatsapp/          # Integração WAHA (15 endpoints)
+├── whatsapp/          # Integração Evolution API (15 endpoints)
 ├── numbers/           # Instâncias WhatsApp (6 endpoints)
 ├── schedule/          # Agendamento (jobs)
 ├── queue/             # Filas assíncronas (Bull)
@@ -217,7 +217,7 @@ Documentação completa e interativa de todos os 121 endpoints.
 
 **Progresso Recente**:
 - ✅ Backend NestJS completamente funcional
-- ✅ WAHA integration corrigida (QR Code generation)
+- ✅ Evolution API integration implementada (QR Code generation)
 - ✅ Guia de testes manuais criado (`TESTING-MANUAL-GUIDE.md`)
 - ✅ Frontend React conectando ao backend NestJS
 - ⚠️ Requer autenticação JWT para acesso (configurado corretamente)
@@ -236,7 +236,7 @@ Documentação completa e interativa de todos os 121 endpoints.
 
 - [x] Backend 100% implementado e testado (E2E)
 - [x] Frontend conectando ao backend NestJS
-- [x] WAHA integration funcional
+- [x] Evolution API integration funcional
 - [ ] **Testes manuais completos** (19 testes no guia)
   - [ ] Módulo Contatos (7 testes)
   - [ ] Módulo Campanhas (5 testes)
@@ -250,7 +250,7 @@ Documentação completa e interativa de todos os 121 endpoints.
 
 - [ ] **Integrações Externas**
   - [ ] Stripe webhooks em test mode
-  - [ ] WAHA/WhatsApp connection real (scan QR + polling)
+  - [ ] Evolution API/WhatsApp connection real (scan QR + polling)
   - [ ] Redis + Bull queues funcionando
   - [ ] Email service (SMTP) - se aplicável
   - [ ] File storage (uploads/downloads)
@@ -267,7 +267,7 @@ Documentação completa e interativa de todos os 121 endpoints.
   - [ ] Configurar servidor staging
   - [ ] Setup Redis em staging
   - [ ] Configure Stripe test mode
-  - [ ] Configure WAHA test instance
+  - [ ] Configure Evolution API test instance
   - [ ] Setup monitoring (logs, errors, métricas)
 
 - [ ] **Deploy Pipeline**
@@ -311,10 +311,10 @@ Documentação completa e interativa de todos os 121 endpoints.
 
 ### 🚨 Issues Conhecidos e Soluções
 
-#### 1. WAHA QR Code Generation
-**Status**: ✅ Resolvido
-**Problema**: Backend usava POST ao invés de GET
-**Solução**: Corrigido em `waha.service.ts` (linha 52)
+#### 1. Evolution API QR Code Generation
+**Status**: ✅ Implementado
+**Problema**: Migração de WAHA para Evolution API
+**Solução**: Implementado provider desacoplado em `evolution-api.provider.ts`
 
 #### 2. Frontend Authentication
 **Status**: ✅ Funcionando

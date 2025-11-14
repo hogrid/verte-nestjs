@@ -31,11 +31,16 @@ import { Public } from '../database/entities/public.entity';
  *
  * Módulo central para gerenciamento de filas assíncronas usando Bull + Redis.
  *
+ * **ARQUITETURA DESACOPLADA**:
+ * - Importa WhatsappModule que exporta WHATSAPP_PROVIDER
+ * - Processors usam IWhatsAppProvider interface (não depende de implementação)
+ * - Permite trocar provider WhatsApp sem alterar lógica de filas
+ *
  * Queues disponíveis:
  * - campaigns: Processamento e disparo de campanhas agendadas
  * - simplified-public: Processamento de públicos simplificados
  * - custom-public: Processamento de públicos customizados (XLSX)
- * - whatsapp-message: Envio de mensagens WhatsApp via WAHA
+ * - whatsapp-message: Envio de mensagens WhatsApp via IWhatsAppProvider
  *
  * Cada queue possui:
  * - Retry automático (3 tentativas com backoff exponencial)

@@ -1,5 +1,5 @@
 import { Process, Processor } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bull';
@@ -8,14 +8,15 @@ import { QUEUE_NAMES } from '../../config/redis.config';
 import { PublicByContact } from '../../database/entities/public-by-contact.entity';
 import { Campaign } from '../../database/entities/campaign.entity';
 import { getErrorStack, getErrorMessage } from '../queue.helpers';
-import { WahaService } from '../../whatsapp/waha.service';
+import type { IWhatsAppProvider } from '../../whatsapp/providers/whatsapp-provider.interface';
+import { WHATSAPP_PROVIDER } from '../../whatsapp/providers/whatsapp-provider.interface';
 
 interface WhatsappMessageJobData {
   campaignId: number;
   contactId: number;
   publicByContactId: number;
   numberId: number;
-  sessionName: string;
+  sessionName: string; // Nome da instância WhatsApp (compatibilidade Laravel)
   messages: Array<{
     id: number;
     type: string | null;
@@ -30,18 +31,23 @@ interface WhatsappMessageJobData {
 /**
  * WhatsappMessageProcessor
  *
- * Envia mensagens WhatsApp via WAHA API de forma assíncrona.
+ * Envia mensagens WhatsApp via IWhatsAppProvider de forma assíncrona.
+ *
+ * **ARQUITETURA DESACOPLADA**:
+ * - Usa IWhatsAppProvider interface (não depende de implementação concreta)
+ * - Permite trocar provider facilmente (Evolution API, WAHA, Cloud API, etc)
+ * - Provider injetado via Dependency Injection
  *
  * Fluxo:
  * 1. Recebe dados da campanha e contato
  * 2. Para cada mensagem da campanha:
- *    - Envia via WAHA API (text, image, video, audio, etc)
+ *    - Envia via WhatsApp Provider (text, image, video, audio, etc)
  *    - Aguarda intervalo entre mensagens (evitar spam)
  *    - Trata erros e retry automático
  * 3. Atualiza PublicByContact com status de envio
  * 4. Atualiza Campaign com progresso
  *
- * Compatibilidade: Laravel WhatsappMessageJob + WAHA integration
+ * Compatibilidade: Laravel WhatsappMessageJob
  */
 @Processor(QUEUE_NAMES.WHATSAPP_MESSAGE)
 export class WhatsappMessageProcessor {
@@ -54,8 +60,13 @@ export class WhatsappMessageProcessor {
     private readonly campaignRepository: Repository<Campaign>,
     @InjectQueue(QUEUE_NAMES.CAMPAIGNS)
     private readonly campaignsQueue: Queue,
-    private readonly wahaService: WahaService,
-  ) {}
+    @Inject(WHATSAPP_PROVIDER)
+    private readonly whatsappProvider: IWhatsAppProvider,
+  ) {
+    this.logger.log(
+      `📱 WhatsappMessageProcessor initialized with provider: ${this.whatsappProvider.providerName} (${this.whatsappProvider.providerVersion})`,
+    );
+  }
 
   /**
    * Send campaign messages to a contact
@@ -85,9 +96,12 @@ export class WhatsappMessageProcessor {
       );
 
       // Enviar cada mensagem
+      // sessionName do Laravel é usado como instanceName do Evolution API
+      const instanceName = sessionName;
+
       for (const message of sortedMessages) {
         try {
-          await this.sendMessage(sessionName, phone, message);
+          await this.sendMessage(instanceName, phone, message);
           this.logger.log(`✅ Mensagem ${message.order} enviada para ${phone}`);
 
           // Aguardar intervalo entre mensagens (1-3 segundos, variável para parecer humano)
@@ -148,11 +162,11 @@ export class WhatsappMessageProcessor {
   }
 
   /**
-   * Send a single message via WAHA API
-   * Uses WahaService for actual sending
+   * Send a single message via WhatsApp Provider
+   * Uses IWhatsAppProvider for actual sending (architecture decoupled)
    */
   private async sendMessage(
-    sessionName: string,
+    instanceName: string,
     phone: string,
     message: {
       type: string | null;
@@ -169,51 +183,65 @@ export class WhatsappMessageProcessor {
       switch (messageType) {
         case 'text':
         case '1': // Laravel usa número como tipo
-          await this.wahaService.sendText(sessionName, phone, messageText);
+          await this.whatsappProvider.sendText(instanceName, {
+            to: phone,
+            text: messageText,
+          });
           break;
 
         case 'image':
         case '2':
-          await this.wahaService.sendImage(
-            sessionName,
-            phone,
-            mediaUrl,
-            messageText,
-          );
+          await this.whatsappProvider.sendMedia(instanceName, {
+            to: phone,
+            mediaUrl: mediaUrl,
+            mediaType: 'image',
+            caption: messageText,
+          });
           break;
 
         case 'video':
         case '4':
-          await this.wahaService.sendVideo(
-            sessionName,
-            phone,
-            mediaUrl,
-            messageText,
-          );
+          await this.whatsappProvider.sendMedia(instanceName, {
+            to: phone,
+            mediaUrl: mediaUrl,
+            mediaType: 'video',
+            caption: messageText,
+          });
           break;
 
         case 'audio':
         case '3':
-          await this.wahaService.sendAudio(sessionName, phone, mediaUrl);
+          await this.whatsappProvider.sendMedia(instanceName, {
+            to: phone,
+            mediaUrl: mediaUrl,
+            mediaType: 'audio',
+          });
           break;
 
         case 'document':
-          await this.wahaService.sendImage(
-            sessionName,
-            phone,
-            mediaUrl,
-            messageText,
-          );
+          await this.whatsappProvider.sendMedia(instanceName, {
+            to: phone,
+            mediaUrl: mediaUrl,
+            mediaType: 'document',
+            caption: messageText,
+          });
           break;
 
         default:
           // Default to text
-          await this.wahaService.sendText(sessionName, phone, messageText);
+          await this.whatsappProvider.sendText(instanceName, {
+            to: phone,
+            text: messageText,
+          });
       }
 
-      this.logger.log(`✅ Mensagem ${messageType} enviada via WahaService`);
+      this.logger.log(
+        `✅ Mensagem ${messageType} enviada via ${this.whatsappProvider.providerName}`,
+      );
     } catch (error) {
-      this.logger.error(`❌ Erro WAHA API: ${getErrorMessage(error)}`);
+      this.logger.error(
+        `❌ Erro WhatsApp Provider: ${getErrorMessage(error)}`,
+      );
       throw error;
     }
   }

@@ -5,10 +5,22 @@ import axios, { AxiosInstance } from 'axios';
 /**
  * WahaService
  *
+ * ⚠️ **DEPRECATED**: Este service não é mais utilizado no projeto.
+ * O sistema migrou para Evolution API com arquitetura desacoplada.
+ *
+ * **Use ao invés**: `IWhatsAppProvider` interface + `EvolutionApiProvider`
+ *
+ * ---
+ *
  * Service para integração com a WAHA API (WhatsApp HTTP API)
  * Encapsula todas as chamadas HTTP para a API WAHA
  *
  * Documentação WAHA: https://waha.devlike.pro
+ *
+ * **Histórico de migração**:
+ * - WAHA → WhatsApp Cloud API → Evolution API (atual)
+ *
+ * @deprecated Mantido apenas para referência histórica
  */
 @Injectable()
 export class WahaService {
