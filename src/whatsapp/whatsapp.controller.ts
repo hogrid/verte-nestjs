@@ -36,15 +36,22 @@ import { ConfigService } from '@nestjs/config';
 /**
  * WhatsappController
  *
- * Gerencia integração WhatsApp via WhatsApp Cloud API (Meta/Facebook)
- * Mantém 100% de compatibilidade com Laravel WhatsappController (quando possível)
+ * Gerencia integração WhatsApp via Evolution API
+ * Mantém compatibilidade com Laravel WhatsappController (quando possível)
  *
- * **MUDANÇA IMPORTANTE**: Não usa mais WAHA (QR Code)
- * Agora usa WhatsApp Cloud API oficial da Meta
+ * **ARQUITETURA DESACOPLADA**:
+ * - Usa IWhatsAppProvider interface
+ * - Fácil trocar entre providers (Evolution API, WAHA, Cloud API, etc)
+ * - Provider atual: Evolution API v2
  *
- * Total: 10 endpoints principais
+ * **Evolution API**:
+ * - ✅ Múltiplas instâncias (cada usuário com seu WhatsApp)
+ * - ✅ Conexão via QR Code
+ * - ✅ Open-source e auto-hospedável
+ *
+ * Total: 11 endpoints principais (adicionado GET /whatsapp/qrcode/:number)
  */
-@ApiTags('WhatsApp Cloud API')
+@ApiTags('WhatsApp (Evolution API)')
 @Controller('api/v1')
 export class WhatsappController {
   constructor(
@@ -54,31 +61,31 @@ export class WhatsappController {
 
   /**
    * 1. POST /api/v1/whatsapp/setup
-   * Configurar WhatsApp Cloud API (substitui o antigo connect com QR Code)
+   * Configurar WhatsApp via Evolution API (com QR Code)
    */
   @Post('whatsapp/setup')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Configurar WhatsApp Cloud API',
+    summary: 'Configurar WhatsApp via Evolution API',
     description:
-      'Configura WhatsApp usando Phone Number ID e Access Token da Meta. Não usa mais QR Code.',
+      'Cria uma instância WhatsApp e gera QR Code para conexão. Cada usuário pode ter múltiplas instâncias.',
   })
   @ApiBody({ type: SetupWhatsAppDto })
   @ApiResponse({
     status: 200,
-    description: 'WhatsApp configurado com sucesso',
+    description: 'Instância criada e QR Code gerado',
     schema: {
       example: {
         success: true,
-        message: 'WhatsApp configurado com sucesso',
+        message: 'WhatsApp configurado. Escaneie o QR Code para conectar seu número.',
         number: {
           id: 1,
           name: 'WhatsApp Principal',
-          phone_number: '+5511999999999',
-          verified_name: 'Minha Empresa',
-          quality_rating: 'GREEN',
+          instance_name: 'user_123_whatsapp',
+          qr_code: 'data:image/png;base64,...',
+          status: 'qr',
         },
       },
     },
@@ -86,13 +93,49 @@ export class WhatsappController {
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({
     status: 400,
-    description: 'Phone Number ID ou Access Token inválidos',
+    description: 'Erro ao criar instância',
   })
   async setupWhatsApp(
     @Request() req: { user: { id: number } },
     @Body() dto: SetupWhatsAppDto,
   ) {
     return this.whatsappService.setupWhatsApp(req.user.id, dto);
+  }
+
+  /**
+   * 1.5. GET /api/v1/whatsapp/qrcode/:number
+   * Obter QR Code para conectar (novo endpoint)
+   */
+  @Get('whatsapp/qrcode/:number')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Obter QR Code',
+    description: 'Obtém QR Code atualizado para conectar WhatsApp',
+  })
+  @ApiParam({
+    name: 'number',
+    description: 'ID do número',
+    example: 1,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'QR Code obtido',
+    schema: {
+      example: {
+        success: true,
+        qr_code: 'data:image/png;base64,...',
+        instance_name: 'user_123_whatsapp',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Número não encontrado' })
+  async getQRCode(
+    @Request() req: { user: { id: number } },
+    @Param('number') numberId: number,
+  ) {
+    return this.whatsappService.getQRCode(req.user.id, numberId);
   }
 
   /**

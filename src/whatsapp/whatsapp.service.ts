@@ -3,35 +3,36 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Number } from '../database/entities/number.entity';
 import { MessageByContact } from '../database/entities/message-by-contact.entity';
 import { PublicByContact } from '../database/entities/public-by-contact.entity';
-import { WhatsAppCloudService } from './whatsapp-cloud.service';
+import type { IWhatsAppProvider } from './providers/whatsapp-provider.interface';
+import { WHATSAPP_PROVIDER } from './providers/whatsapp-provider.interface';
 import { SetupWhatsAppDto } from './dto/setup-whatsapp.dto';
 import {
   SendTextMessageDto,
   SendTemplateMessageDto,
   SendImageMessageDto,
 } from './dto/send-message.dto';
-import {
-  WhatsAppWebhookPayload,
-  WhatsAppMessage,
-  WhatsAppStatus,
-} from './dto/webhook.dto';
 
 /**
  * WhatsappService
  *
  * Service para gerenciar lógica de negócio WhatsApp
- * Agora usa WhatsApp Cloud API (Meta) em vez de WAHA
  *
- * Vantagens:
- * - ✅ Suporta múltiplas sessões (cada usuário pode ter seu próprio Phone Number ID)
- * - ✅ Não precisa de QR Code (usa Phone Number ID + Access Token da Meta)
- * - ✅ Mais estável e seguro (API oficial)
+ * **ARQUITETURA DESACOPLADA**:
+ * - Usa IWhatsAppProvider interface (não depende de implementação concreta)
+ * - Permite trocar provider facilmente (Evolution API, WAHA, Cloud API, etc)
+ * - Provider injetado via Dependency Injection
+ *
+ * Benefícios:
+ * - ✅ Fácil trocar de provider WhatsApp
+ * - ✅ Testável (mock providers)
+ * - ✅ Extensível (adicionar novos providers sem alterar service)
  */
 @Injectable()
 export class WhatsappService {
@@ -44,27 +45,33 @@ export class WhatsappService {
     private readonly messageByContactRepository: Repository<MessageByContact>,
     @InjectRepository(PublicByContact)
     private readonly publicByContactRepository: Repository<PublicByContact>,
-    private readonly whatsappCloudService: WhatsAppCloudService,
-  ) {}
+    @Inject(WHATSAPP_PROVIDER)
+    private readonly whatsappProvider: IWhatsAppProvider,
+  ) {
+    this.logger.log(
+      `📱 WhatsappService initialized with provider: ${this.whatsappProvider.providerName} (${this.whatsappProvider.providerVersion})`,
+    );
+  }
 
   /**
-   * Setup WhatsApp - Configura Phone Number ID e Access Token
-   * Substitui o antigo método connect() que usava QR Code
+   * Setup WhatsApp - Criar instância e gerar QR Code
    */
   async setupWhatsApp(userId: number, dto: SetupWhatsAppDto) {
-    this.logger.log('🔌 Configurando WhatsApp Cloud API', { userId });
+    this.logger.log('🔌 Configurando WhatsApp', { userId, dto });
 
     try {
-      // Verificar se o Phone Number ID é válido
-      const phoneInfo = await this.whatsappCloudService.getPhoneNumberInfo(
-        dto.phone_number_id,
-        dto.access_token,
-      );
+      // Criar nome único da instância baseado no userId
+      const instanceName =
+        dto.instanceName || `user_${userId}_${Date.now()}`;
 
-      this.logger.log('✅ Phone Number ID válido', {
-        verified_name: phoneInfo.verified_name,
-        display_phone_number: phoneInfo.display_phone_number,
+      // Criar instância no provider (Evolution API)
+      const instanceInfo = await this.whatsappProvider.createInstance({
+        instanceName,
+        qrcode: true,
+        webhookUrl: dto.webhookUrl,
       });
+
+      this.logger.log('✅ Instância criada no provider', { instanceName });
 
       // Verificar se já existe um número ativo para este usuário
       let number = await this.numberRepository.findOne({
@@ -75,21 +82,17 @@ export class WhatsappService {
         // Criar novo número
         number = this.numberRepository.create({
           user_id: userId,
-          name: dto.name || phoneInfo.verified_name || 'WhatsApp Principal',
-          instance: dto.phone_number_id, // Usar Phone Number ID como instance
+          name: dto.name || 'WhatsApp Principal',
+          instance: instanceName,
           status: 1,
-          status_connection: 1, // Já conectado pois tem access token válido
-          cel: phoneInfo.display_phone_number,
-          token_wpp: dto.access_token,
-          token_wpp_expiresin: null, // System User Token não expira
+          status_connection: 0, // Aguardando conexão via QR Code
+          qrcode: instanceInfo.qrCode || null,
         });
       } else {
         // Atualizar número existente
-        number.instance = dto.phone_number_id;
-        number.status_connection = 1;
-        number.cel = phoneInfo.display_phone_number;
-        number.token_wpp = dto.access_token;
-        number.token_wpp_expiresin = null;
+        number.instance = instanceName;
+        number.status_connection = 0; // Resetar status
+        number.qrcode = instanceInfo.qrCode || null;
         if (dto.name) {
           number.name = dto.name;
         }
@@ -99,17 +102,19 @@ export class WhatsappService {
 
       this.logger.log('✅ WhatsApp configurado com sucesso', {
         number_id: number.id,
+        instanceName,
       });
 
       return {
         success: true,
-        message: 'WhatsApp configurado com sucesso',
+        message:
+          'WhatsApp configurado. Escaneie o QR Code para conectar seu número.',
         number: {
           id: number.id,
           name: number.name,
-          phone_number: phoneInfo.display_phone_number,
-          verified_name: phoneInfo.verified_name,
-          quality_rating: phoneInfo.quality_rating,
+          instance_name: instanceName,
+          qr_code: instanceInfo.qrCode,
+          status: 'qr', // Aguardando scan do QR Code
         },
       };
     } catch (error: unknown) {
@@ -117,8 +122,48 @@ export class WhatsappService {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new BadRequestException(
-        'Phone Number ID ou Access Token inválidos. Verifique suas credenciais.',
+        `Erro ao configurar WhatsApp: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
       );
+    }
+  }
+
+  /**
+   * Get QR Code - Obter QR Code para conectar
+   */
+  async getQRCode(userId: number, numberId: number) {
+    this.logger.log('📷 Obtendo QR Code', { userId, numberId });
+
+    try {
+      const number = await this.numberRepository.findOne({
+        where: { id: numberId, user_id: userId },
+      });
+
+      if (!number) {
+        throw new NotFoundException('Número não encontrado');
+      }
+
+      if (!number.instance) {
+        throw new BadRequestException('Instância não configurada');
+      }
+
+      // Obter QR Code do provider
+      const qrData = await this.whatsappProvider.getQRCode(number.instance);
+
+      // Atualizar QR Code no banco
+      await this.numberRepository.update(number.id, {
+        qrcode: qrData.qr,
+      });
+
+      return {
+        success: true,
+        qr_code: qrData.qr,
+        instance_name: number.instance,
+      };
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao obter QR Code', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
     }
   }
 
@@ -140,43 +185,33 @@ export class WhatsappService {
         };
       }
 
-      if (!number.token_wpp || !number.instance) {
+      if (!number.instance) {
         return {
           connected: false,
           message: 'WhatsApp não configurado',
         };
       }
 
-      // Verificar se o token ainda é válido
-      try {
-        const phoneInfo = await this.whatsappCloudService.getPhoneNumberInfo(
-          number.instance,
-          number.token_wpp,
-        );
+      // Verificar status no provider
+      const instanceInfo = await this.whatsappProvider.getInstanceStatus(
+        number.instance,
+      );
 
-        // Atualizar status de conexão
-        await this.numberRepository.update(number.id, {
-          status_connection: 1,
-          cel: phoneInfo.display_phone_number,
-        });
+      // Atualizar status no banco
+      const connectionStatus =
+        instanceInfo.status === 'connected' ? 1 : 0;
+      await this.numberRepository.update(number.id, {
+        status_connection: connectionStatus,
+        cel: instanceInfo.phoneNumber || number.cel,
+      });
 
-        return {
-          connected: true,
-          phone_number: phoneInfo.display_phone_number,
-          verified_name: phoneInfo.verified_name,
-          quality_rating: phoneInfo.quality_rating,
-        };
-      } catch (error) {
-        // Token inválido ou expirado
-        await this.numberRepository.update(number.id, {
-          status_connection: 0,
-        });
-
-        return {
-          connected: false,
-          message: 'Access Token inválido ou expirado',
-        };
-      }
+      return {
+        connected: instanceInfo.status === 'connected',
+        status: instanceInfo.status,
+        phone_number: instanceInfo.phoneNumber,
+        profile_name: instanceInfo.profileName,
+        instance_name: number.instance,
+      };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao verificar conexão', {
         error: error instanceof Error ? error.message : String(error),
@@ -196,7 +231,6 @@ export class WhatsappService {
     this.logger.log('📤 Enviando mensagem de texto', { userId, dto });
 
     try {
-      // Buscar número do usuário
       const number = await this.numberRepository.findOne({
         where: { id: dto.number_id, user_id: userId },
       });
@@ -205,19 +239,23 @@ export class WhatsappService {
         throw new NotFoundException('Número não encontrado');
       }
 
-      if (!number.token_wpp || !number.instance) {
+      if (!number.instance) {
         throw new BadRequestException(
           'WhatsApp não configurado. Configure primeiro.',
         );
       }
 
-      // Enviar mensagem via WhatsApp Cloud API
-      const result = await this.whatsappCloudService.sendTextMessage(
-        number.instance,
-        number.token_wpp,
-        dto.to,
-        dto.text,
-      );
+      if (number.status_connection !== 1) {
+        throw new BadRequestException(
+          'WhatsApp não conectado. Conecte via QR Code primeiro.',
+        );
+      }
+
+      // Enviar mensagem via provider
+      const result = await this.whatsappProvider.sendText(number.instance, {
+        to: dto.to,
+        text: dto.text,
+      });
 
       this.logger.log('✅ Mensagem enviada', { messageId: result.messageId });
 
@@ -248,20 +286,35 @@ export class WhatsappService {
         throw new NotFoundException('Número não encontrado');
       }
 
-      if (!number.token_wpp || !number.instance) {
+      if (!number.instance) {
         throw new BadRequestException(
           'WhatsApp não configurado. Configure primeiro.',
         );
       }
 
-      const result = await this.whatsappCloudService.sendTemplateMessage(
-        number.instance,
-        number.token_wpp,
-        dto.to,
-        dto.template_name,
-        dto.language_code || 'pt_BR',
-        dto.parameters,
-      );
+      if (number.status_connection !== 1) {
+        throw new BadRequestException(
+          'WhatsApp não conectado. Conecte via QR Code primeiro.',
+        );
+      }
+
+      // Enviar template via provider (se suportado)
+      let result;
+      if (this.whatsappProvider.sendTemplate) {
+        result = await this.whatsappProvider.sendTemplate(number.instance, {
+          to: dto.to,
+          templateName: dto.template_name,
+          languageCode: dto.language_code || 'pt_BR',
+          parameters: dto.parameters,
+        });
+      } else {
+        // Fallback: enviar como texto
+        this.logger.warn('⚠️ Provider não suporta templates. Enviando como texto.');
+        result = await this.whatsappProvider.sendText(number.instance, {
+          to: dto.to,
+          text: `Template: ${dto.template_name}`,
+        });
+      }
 
       this.logger.log('✅ Template enviado', { messageId: result.messageId });
 
@@ -292,19 +345,25 @@ export class WhatsappService {
         throw new NotFoundException('Número não encontrado');
       }
 
-      if (!number.token_wpp || !number.instance) {
+      if (!number.instance) {
         throw new BadRequestException(
           'WhatsApp não configurado. Configure primeiro.',
         );
       }
 
-      const result = await this.whatsappCloudService.sendImageMessage(
-        number.instance,
-        number.token_wpp,
-        dto.to,
-        dto.image_url,
-        dto.caption,
-      );
+      if (number.status_connection !== 1) {
+        throw new BadRequestException(
+          'WhatsApp não conectado. Conecte via QR Code primeiro.',
+        );
+      }
+
+      // Enviar imagem via provider
+      const result = await this.whatsappProvider.sendMedia(number.instance, {
+        to: dto.to,
+        mediaUrl: dto.image_url,
+        mediaType: 'image',
+        caption: dto.caption,
+      });
 
       this.logger.log('✅ Imagem enviada', { messageId: result.messageId });
 
@@ -337,6 +396,7 @@ export class WhatsappService {
           id: n.id,
           name: n.name,
           phone_number: n.cel,
+          instance_name: n.instance,
           status: n.status,
           status_connection: n.status_connection,
           created_at: n.created_at,
@@ -371,6 +431,7 @@ export class WhatsappService {
           id: number.id,
           name: number.name,
           phone_number: number.cel,
+          instance_name: number.instance,
           status: number.status,
           status_connection: number.status_connection,
           created_at: number.created_at,
@@ -400,7 +461,19 @@ export class WhatsappService {
         throw new NotFoundException('Número não encontrado');
       }
 
-      // Soft delete
+      // Deletar instância no provider
+      if (number.instance) {
+        try {
+          await this.whatsappProvider.deleteInstance(number.instance);
+          this.logger.log('✅ Instância deletada no provider');
+        } catch (error) {
+          this.logger.warn(
+            '⚠️ Erro ao deletar instância no provider (continuando...)',
+          );
+        }
+      }
+
+      // Soft delete no banco
       await this.numberRepository.softDelete(numberId);
 
       this.logger.log('✅ Número removido', { number_id: numberId });
@@ -418,46 +491,31 @@ export class WhatsappService {
   }
 
   /**
-   * Handle webhook events from WhatsApp Cloud API
+   * Handle webhook events
    */
-  async handleWebhook(payload: WhatsAppWebhookPayload) {
+  async handleWebhook(payload: any) {
     try {
-      this.logger.log('📥 Webhook recebido', {
-        object: payload.object,
-        entries: payload.entry.length,
-      });
+      this.logger.log('📥 Webhook recebido');
 
-      if (payload.object !== 'whatsapp_business_account') {
-        this.logger.warn('⚠️ Webhook com object inválido', {
-          object: payload.object,
-        });
-        return { success: false, message: 'Object inválido' };
+      // Validar webhook (se provider suportar)
+      if (this.whatsappProvider.validateWebhook) {
+        const isValid = this.whatsappProvider.validateWebhook(payload);
+        if (!isValid) {
+          this.logger.warn('⚠️ Webhook inválido');
+          return { success: false, message: 'Webhook inválido' };
+        }
       }
 
-      for (const entry of payload.entry) {
-        for (const change of entry.changes) {
-          if (change.field === 'messages') {
-            // Processar mensagens recebidas
-            if (change.value.messages) {
-              for (const message of change.value.messages) {
-                await this.processIncomingMessage(
-                  change.value.metadata.phone_number_id,
-                  message,
-                );
-              }
-            }
+      // Processar webhook (se provider suportar)
+      if (this.whatsappProvider.processWebhook) {
+        const processed = await this.whatsappProvider.processWebhook(payload);
 
-            // Processar status de mensagens enviadas
-            if (change.value.statuses) {
-              for (const status of change.value.statuses) {
-                await this.processMessageStatus(
-                  change.value.metadata.phone_number_id,
-                  status,
-                );
-              }
-            }
-          }
-        }
+        this.logger.log('✅ Webhook processado', { type: processed.type });
+
+        // TODO: Implementar lógica de processamento baseada no tipo
+        // - message: Salvar mensagem recebida no banco
+        // - status: Atualizar status de mensagem enviada
+        // - connection: Atualizar status de conexão
       }
 
       return {
@@ -473,118 +531,6 @@ export class WhatsappService {
         success: false,
         error: error instanceof Error ? error.message : 'Erro desconhecido',
       };
-    }
-  }
-
-  /**
-   * Process incoming message
-   */
-  private async processIncomingMessage(
-    phoneNumberId: string,
-    message: WhatsAppMessage,
-  ) {
-    this.logger.log('📩 Processando mensagem recebida', {
-      phoneNumberId,
-      messageId: message.id,
-      type: message.type,
-      from: message.from,
-    });
-
-    // TODO: Implementar lógica de processamento de mensagens recebidas
-    // - Salvar no banco de dados
-    // - Disparar eventos para webhooks do usuário
-    // - Processar comandos automáticos
-  }
-
-  /**
-   * Process message status update
-   */
-  private async processMessageStatus(
-    phoneNumberId: string,
-    status: WhatsAppStatus,
-  ) {
-    this.logger.log('✅ Processando status de mensagem', {
-      phoneNumberId,
-      messageId: status.id,
-      status: status.status,
-      recipientId: status.recipient_id,
-    });
-
-    // Atualizar status no banco de dados
-    const phoneNumber = status.recipient_id.replace(/\D/g, '');
-
-    try {
-      // Atualizar MessageByContact
-      switch (status.status) {
-        case 'sent':
-          await this.messageByContactRepository
-            .createQueryBuilder()
-            .update(MessageByContact)
-            .set({ send: 1 } as any)
-            .where(
-              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
-              { phone: phoneNumber },
-            )
-            .execute();
-          break;
-
-        case 'delivered':
-          await this.messageByContactRepository
-            .createQueryBuilder()
-            .update(MessageByContact)
-            .set({ send: 1, delivered: 1 } as any)
-            .where(
-              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
-              { phone: phoneNumber },
-            )
-            .execute();
-          break;
-
-        case 'read':
-          await this.messageByContactRepository
-            .createQueryBuilder()
-            .update(MessageByContact)
-            .set({ send: 1, delivered: 1, read: 1 } as any)
-            .where(
-              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
-              { phone: phoneNumber },
-            )
-            .execute();
-
-          // Atualizar PublicByContact também
-          await this.publicByContactRepository
-            .createQueryBuilder()
-            .update(PublicByContact)
-            .set({ read: 1 })
-            .where(
-              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
-              { phone: phoneNumber },
-            )
-            .execute();
-          break;
-
-        case 'failed':
-          await this.messageByContactRepository
-            .createQueryBuilder()
-            .update(MessageByContact)
-            .set({
-              error: status.errors?.[0]?.message || 'Erro ao enviar mensagem',
-            } as any)
-            .where(
-              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
-              { phone: phoneNumber },
-            )
-            .execute();
-          break;
-      }
-
-      this.logger.log('✅ Status atualizado no banco de dados', {
-        status: status.status,
-      });
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao atualizar status no banco', {
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
   }
 }

@@ -18,18 +18,25 @@ Backend NestJS do sistema **Verte** - Plataforma de automação de marketing via
 - **121/121 endpoints** implementados
 - **415+ cenários de teste E2E** (100% passando)
 - **22+ tabelas** MySQL compartilhadas com Laravel
-- **Integrações**: **WhatsApp Cloud API** (Meta), Stripe, MercadoPago
+- **Integrações**: **Evolution API v2** (WhatsApp), Stripe, MercadoPago
 - **100% compatibilidade** Laravel (responses idênticos, validações em português)
 
-### ⚡ Mudança Importante: WhatsApp Cloud API
+### ⚡ Mudança Importante: Evolution API + Arquitetura Desacoplada
 
-**Migrado de WAHA para WhatsApp Cloud API oficial da Meta**
+**Migrado WAHA → Cloud API → Evolution API com arquitetura provider-based**
 
-**Vantagens:**
-- ✅ Múltiplas sessões (cada usuário tem seu próprio Phone Number ID)
-- ✅ Não precisa de QR Code (usa Phone Number ID + Access Token)
-- ✅ Mais estável e seguro (API oficial da Meta)
-- ✅ Não requer servidor adicional (WAHA)
+**Vantagens Evolution API:**
+- ✅ Múltiplas sessões (cada usuário conecta seu próprio número via QR Code)
+- ✅ Conexão via QR Code (não precisa aprovação Meta)
+- ✅ Open-source e auto-hospedável
+- ✅ Gratuito e sem limitações
+- ✅ API completa (mensagens, mídia, webhooks)
+
+**Arquitetura Desacoplada:**
+- ✅ Interface `IWhatsAppProvider` abstrata
+- ✅ Fácil trocar entre providers (Evolution API, WAHA, Cloud API, etc)
+- ✅ Dependency Injection via NestJS
+- ✅ Zero mudanças no service/controller ao trocar provider
 
 ### 📦 Módulos Implementados
 
@@ -38,7 +45,7 @@ Backend NestJS do sistema **Verte** - Plataforma de automação de marketing via
 | **Core** | Auth, Users, Plans | 20 | ✅ 66 cenários |
 | **Contatos** | Contacts, Labels, Publics | 18 | ✅ 99 cenários |
 | **Campanhas** | Campaigns, Templates, Queue | 20 | ✅ 47 cenários |
-| **WhatsApp** | WhatsApp, Numbers, Schedule | 25 | ✅ 63 cenários |
+| **WhatsApp** | WhatsApp (Evolution API), Numbers, Schedule | 25 | ✅ 63 cenários |
 | **Pagamentos** | Payments (Stripe) | 4 | ✅ 16 cenários |
 | **Arquivos** | Files, Export | 5 | ✅ 34 cenários |
 | **Admin** | Admin, Dashboard, Utilities | 29 | ✅ 63 cenários |
@@ -83,10 +90,10 @@ JWT_EXPIRATION=3600
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 
-# WhatsApp Cloud API (Meta/Facebook)
-# Cada usuário configura seu próprio Phone Number ID + Access Token via interface
-WHATSAPP_API_VERSION=v21.0
-WHATSAPP_WEBHOOK_VERIFY_TOKEN=verte_webhook_token_2024
+# Evolution API (WhatsApp Multi-Sessão com QR Code)
+# Docs: https://doc.evolution-api.com/v2
+EVOLUTION_API_URL=http://localhost:8080
+EVOLUTION_API_KEY=change-me-to-secure-api-key
 ```
 
 **⚠️ NÃO criar novas tabelas! Use o banco existente do Laravel.**
