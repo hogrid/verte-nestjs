@@ -457,7 +457,7 @@ where: { deleted_at: null }      // ❌ ERRADO
 **Fase Atual**: Testes de Compatibilidade Frontend
 
 **Progresso Recente**:
-- ✅ WAHA integration corrigida (QR Code generation via GET)
+- ✅ Evolution API implementada com arquitetura desacoplada (IWhatsAppProvider)
 - ✅ Backend 100% funcional (121 endpoints)
 - ✅ Frontend conectando ao backend NestJS
 - ✅ Guia de testes manuais criado (`TESTING-MANUAL-GUIDE.md`)
@@ -472,7 +472,7 @@ where: { deleted_at: null }      // ❌ ERRADO
 2. **Testes de Integração** (2-3 dias)
    - Frontend + Backend end-to-end
    - Stripe webhooks em test mode
-   - WAHA WhatsApp (QR Code + polling real)
+   - Evolution API WhatsApp (QR Code + polling real)
    - Redis + Bull queues
    - File uploads/downloads
 

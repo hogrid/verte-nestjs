@@ -75,8 +75,9 @@ async function bootstrap() {
         '- Mesma estrutura de responses\n' +
         '- Validações em português\n' +
         '- Banco de dados compartilhado\n\n' +
-        '**Progresso**: 5% (6/121 endpoints)\n' +
-        '**Módulos completos**: Auth (6 endpoints)',
+        '**Progresso**: ✅ 100% COMPLETO (121/121 endpoints)\n' +
+        '**Módulos**: 21 módulos implementados | 415+ testes E2E\n' +
+        '**WhatsApp**: Evolution API v2 (arquitetura desacoplada)',
     )
     .setVersion('1.0.0')
     .setContact(
@@ -86,11 +87,11 @@ async function bootstrap() {
     )
     .addTag('Auth', 'Autenticação e gerenciamento de sessão')
     .addTag('Plans', 'Gerenciamento de planos de assinatura')
-    .addTag('Users', 'Gerenciamento de usuários (Pendente)')
-    .addTag('Campaigns', 'Campanhas de marketing (Pendente)')
-    .addTag('Contacts', 'Gerenciamento de contatos (Pendente)')
-    .addTag('WhatsApp', 'Integração WAHA (Pendente)')
-    .addTag('Payments', 'Pagamentos Stripe/MercadoPago (Pendente)')
+    .addTag('Users', 'Gerenciamento de usuários')
+    .addTag('Campaigns', 'Campanhas de marketing')
+    .addTag('Contacts', 'Gerenciamento de contatos')
+    .addTag('WhatsApp (Evolution API)', 'Integração WhatsApp via Evolution API v2')
+    .addTag('Payments', 'Pagamentos Stripe/MercadoPago')
     .addBearerAuth(
       {
         type: 'http',

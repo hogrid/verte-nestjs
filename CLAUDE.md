@@ -125,8 +125,7 @@ npm run validate:full
 - ✅ Autenticação e autorização (JWT + AdminGuard)
 - ✅ CRUD completo de todos os recursos
 - ✅ Validações em português
-- ✅ Soft deletes
-- ✅ Integrações (Stripe, Evolution API)
+- ✅ Soft deletes, Integrações (Stripe, Evolution API)
 - ✅ Upload/Download de arquivos
 - ✅ Paginação estilo Laravel
 - ✅ Webhooks e callbacks
@@ -267,7 +266,7 @@ Documentação completa e interativa de todos os 121 endpoints.
   - [ ] Configurar servidor staging
   - [ ] Setup Redis em staging
   - [ ] Configure Stripe test mode
-  - [ ] Configure Evolution API test instance
+  - [ ] Configure Evolution API "test instance"
   - [ ] Setup monitoring (logs, errors, métricas)
 
 - [ ] **Deploy Pipeline**

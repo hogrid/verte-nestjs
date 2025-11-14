@@ -52,7 +52,7 @@ Esta documentação fornece um inventário completo e detalhado do projeto Larav
 **Crítico para**: Implementar autenticação JWT e guards no NestJS
 
 ### 6. **[Dependências Externas](./dependencies-external.md)**
-- Integração WhatsApp (WAHA API)
+- Integração WhatsApp (Evolution API - arquitetura desacoplada)
 - Pagamentos (Stripe e MercadoPago)
 - Email e notificações
 - WebSockets (Pusher)

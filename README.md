@@ -21,7 +21,7 @@ Este repositório contém a **migração do backend Verte de Laravel 8 para Nest
 - ✅ **Responses JSON** idênticos
 - ✅ **Validações** em português preservadas
 - ✅ **Zero impacto** no frontend
-- ✅ **Integrações** mantidas (WAHA, Stripe, MercadoPago)
+- ✅ **Integrações** mantidas (Evolution API, Stripe, MercadoPago)
 
 ### 🎯 Objetivo
 
