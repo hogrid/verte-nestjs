@@ -42,19 +42,26 @@ export class WahaService {
 
   /**
    * Get QR Code for session
-   * POST /api/{session}/auth/qr
+   * GET /api/{session}/auth/qr (sem "sessions")
    */
   async getQrCode(session: string): Promise<{ qr: string }> {
     try {
       this.logger.log(`🔍 Buscando QR Code para sessão: ${session}`);
 
-      const response = await this.wahaClient.post(
+      // GET (não POST) para pegar o QR Code
+      const response = await this.wahaClient.get(
         `/api/${session}/auth/qr`,
-        {},
+        {
+          responseType: 'arraybuffer', // Receber como binary
+        },
       );
 
+      // Converter para base64
+      const base64 = Buffer.from(response.data, 'binary').toString('base64');
+      const qrDataUrl = `data:image/png;base64,${base64}`;
+
       return {
-        qr: response.data.qr || response.data,
+        qr: qrDataUrl,
       };
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao buscar QR Code: ${session}`, {
@@ -66,7 +73,7 @@ export class WahaService {
 
   /**
    * Get session status
-   * GET /api/{session}
+   * GET /api/sessions/{session}
    */
   async getSessionStatus(session: string): Promise<{
     name: string;
@@ -79,7 +86,7 @@ export class WahaService {
     try {
       this.logger.log(`🔍 Verificando status da sessão: ${session}`);
 
-      const response = await this.wahaClient.get(`/api/${session}`);
+      const response = await this.wahaClient.get(`/api/sessions/${session}`);
 
       return response.data;
     } catch (error: unknown) {
@@ -92,13 +99,13 @@ export class WahaService {
 
   /**
    * Start session
-   * POST /api/{session}/start
+   * POST /api/sessions/{session}/start
    */
   async startSession(session: string): Promise<boolean> {
     try {
       this.logger.log(`▶️ Iniciando sessão: ${session}`);
 
-      await this.wahaClient.post(`/api/${session}/start`, {
+      await this.wahaClient.post(`/api/sessions/${session}/start`, {
         name: session,
       });
 

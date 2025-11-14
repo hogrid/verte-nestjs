@@ -191,70 +191,134 @@ Documentação completa e interativa de todos os 121 endpoints.
 
 ---
 
-## 🎯 Próximos Passos (Fase de Deploy)
+## 🎯 Status Atual e Próximos Passos
 
-### 1. Validação de Compatibilidade
+### ✅ Fase Atual: Testes de Compatibilidade Frontend (13/11/2025)
 
-- [ ] **Testes de compatibilidade com Frontend**
-  - Rodar frontend Laravel contra backend NestJS
-  - Validar todas as telas funcionam
-  - Verificar integrações (login, campanhas, WhatsApp, pagamentos)
+**Status**: Backend 100% funcional, iniciando testes manuais com frontend React
 
-- [ ] **Testes de Integração**
-  - [ ] Stripe webhooks em ambiente de teste
-  - [ ] WAHA/WhatsApp connection real
+**Progresso Recente**:
+- ✅ Backend NestJS completamente funcional
+- ✅ WAHA integration corrigida (QR Code generation)
+- ✅ Guia de testes manuais criado (`TESTING-MANUAL-GUIDE.md`)
+- ✅ Frontend React conectando ao backend NestJS
+- ⚠️ Requer autenticação JWT para acesso (configurado corretamente)
+
+**Próxima Ação Imediata**:
+1. Fazer login no sistema (`http://localhost:3005/login`)
+2. Testar conexão WhatsApp (`http://localhost:3005/connect-whatsapp`)
+3. Validar QR Code generation e polling mechanism
+4. Executar checklist completo do `TESTING-MANUAL-GUIDE.md`
+
+---
+
+### 📋 Roadmap de Deploy
+
+#### **Fase 1: Testes Manuais** (Atual - 1-2 dias)
+
+- [x] Backend 100% implementado e testado (E2E)
+- [x] Frontend conectando ao backend NestJS
+- [x] WAHA integration funcional
+- [ ] **Testes manuais completos** (19 testes no guia)
+  - [ ] Módulo Contatos (7 testes)
+  - [ ] Módulo Campanhas (5 testes)
+  - [ ] Módulo WhatsApp (4 testes)
+  - [ ] Módulo Pagamentos (3 testes)
+- [ ] Correções de bugs encontrados nos testes manuais
+
+**Critério de Sucesso**: 80% dos testes passando (15/19)
+
+#### **Fase 2: Testes de Integração** (2-3 dias)
+
+- [ ] **Integrações Externas**
+  - [ ] Stripe webhooks em test mode
+  - [ ] WAHA/WhatsApp connection real (scan QR + polling)
   - [ ] Redis + Bull queues funcionando
-  - [ ] Email service (SMTP)
+  - [ ] Email service (SMTP) - se aplicável
   - [ ] File storage (uploads/downloads)
 
-### 2. Performance e Otimização
+- [ ] **Performance Testing**
+  - [ ] Load testing com 1000+ contatos
+  - [ ] Teste de campanhas em massa
+  - [ ] Validação de jobs assíncronos (Bull)
+  - [ ] Comparação de performance Laravel vs NestJS
 
-- [ ] **Load Testing**
-  - Comparar performance Laravel vs NestJS
-  - Testar com 1000+ contatos
-  - Testar campanhas em massa
-  - Validar jobs assíncronos (Bull)
+#### **Fase 3: Deploy em Staging** (3-5 dias)
 
-- [ ] **Database Query Optimization**
-  - Review queries com N+1 problems
-  - Adicionar indexes se necessário
-  - Validar eager loading
-
-### 3. Deploy Staging
-
-- [ ] **Environment Setup**
+- [ ] **Preparação de Ambiente**
   - [ ] Configurar servidor staging
-  - [ ] Setup Redis
+  - [ ] Setup Redis em staging
   - [ ] Configure Stripe test mode
   - [ ] Configure WAHA test instance
-  - [ ] Setup monitoring (logs, errors)
+  - [ ] Setup monitoring (logs, errors, métricas)
 
 - [ ] **Deploy Pipeline**
   - [ ] CI/CD setup (GitHub Actions)
   - [ ] Automated tests on PR
-  - [ ] Build validation
-  - [ ] Deploy to staging
+  - [ ] Build validation automatizada
+  - [ ] Deploy automático para staging
 
-### 4. Migração Gradual (Produção)
+- [ ] **Validação em Staging**
+  - [ ] Executar testes manuais em staging
+  - [ ] Validar todas integrações
+  - [ ] Monitorar logs por 24h
+  - [ ] Performance testing em ambiente real
+
+#### **Fase 4: Migração Gradual para Produção** (1-2 semanas)
 
 - [ ] **Blue-Green Deployment**
-  - Deploy NestJS em paralelo ao Laravel
-  - Roteamento gradual (10% → 50% → 100%)
-  - Monitorar erros e performance
-  - Rollback plan
+  - [ ] Deploy NestJS em paralelo ao Laravel
+  - [ ] Configurar load balancer
+  - [ ] Roteamento gradual: 10% → 25% → 50% → 100%
+  - [ ] Monitorar erros e performance em cada etapa
+  - [ ] Rollback plan testado e documentado
 
-- [ ] **Validação Produção**
-  - [ ] Monitorar logs por 24h
-  - [ ] Verificar métricas (latência, erros)
-  - [ ] Validar pagamentos reais
-  - [ ] Confirmar envio de campanhas
+- [ ] **Validação em Produção**
+  - [ ] Monitorar logs por 48h em cada etapa
+  - [ ] Verificar métricas (latência, erros, throughput)
+  - [ ] Validar pagamentos reais (Stripe production)
+  - [ ] Confirmar envio de campanhas real
+  - [ ] Validar WhatsApp connection stability
 
-### 5. Desativação Laravel (Final)
+#### **Fase 5: Desativação Laravel** (1 semana)
 
 - [ ] Confirmar 100% tráfego em NestJS
-- [ ] Manter Laravel por 1 semana (backup)
+- [ ] Manter Laravel por 1 semana (backup ativo)
+- [ ] Monitoramento 24/7 durante período de transição
 - [ ] Desativar Laravel definitivamente
 - [ ] Documentar lições aprendidas
+- [ ] Celebration! 🎉
+
+---
+
+### 🚨 Issues Conhecidos e Soluções
+
+#### 1. WAHA QR Code Generation
+**Status**: ✅ Resolvido
+**Problema**: Backend usava POST ao invés de GET
+**Solução**: Corrigido em `waha.service.ts` (linha 52)
+
+#### 2. Frontend Authentication
+**Status**: ✅ Funcionando
+**Nota**: Endpoint `/connect-whatsapp` requer JWT token válido
+**Solução**: Fazer login antes de acessar a página
+
+#### 3. Multiple Backend Processes
+**Status**: ✅ Resolvido
+**Problema**: Múltiplos processos Node causando conflitos
+**Solução**: Usar `pkill -f "nest start"` antes de restart
+
+---
+
+### 📊 Métricas de Sucesso
+
+| Fase | Métrica | Target | Status |
+|------|---------|--------|--------|
+| Fase 1 | Testes Manuais Passando | 80% (15/19) | 🔄 Em Progresso |
+| Fase 2 | Integrações Funcionais | 100% | ⏳ Pendente |
+| Fase 3 | Uptime em Staging | 99.9% | ⏳ Pendente |
+| Fase 4 | Erro Rate em Produção | <0.1% | ⏳ Pendente |
+| Fase 5 | Migração Completa | 100% tráfego | ⏳ Pendente |
 
 ---
 

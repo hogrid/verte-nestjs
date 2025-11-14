@@ -452,21 +452,47 @@ where: { deleted_at: null }      // ❌ ERRADO
 - Extractor (3 endpoints)
 - Remaining (18 endpoints)
 
-### 🎯 Próximas Tarefas
+### 🎯 Status Atual e Próximas Tarefas (13/11/2025)
 
-1. **Testes de Integração**
-   - Frontend + Backend
-   - Stripe webhooks
-   - WAHA WhatsApp
+**Fase Atual**: Testes de Compatibilidade Frontend
 
-2. **Performance**
-   - Load testing
+**Progresso Recente**:
+- ✅ WAHA integration corrigida (QR Code generation via GET)
+- ✅ Backend 100% funcional (121 endpoints)
+- ✅ Frontend conectando ao backend NestJS
+- ✅ Guia de testes manuais criado (`TESTING-MANUAL-GUIDE.md`)
+
+**Próximas Tarefas Imediatas**:
+
+1. **Testes Manuais com Frontend** (1-2 dias)
+   - Executar 19 testes do guia `TESTING-MANUAL-GUIDE.md`
+   - Validar módulos: Contatos, Campanhas, WhatsApp, Pagamentos
+   - Critério de sucesso: 80% passando (15/19 testes)
+
+2. **Testes de Integração** (2-3 dias)
+   - Frontend + Backend end-to-end
+   - Stripe webhooks em test mode
+   - WAHA WhatsApp (QR Code + polling real)
+   - Redis + Bull queues
+   - File uploads/downloads
+
+3. **Performance Testing** (1-2 dias)
+   - Load testing com 1000+ contatos
+   - Teste de campanhas em massa
    - Query optimization
+   - Comparação Laravel vs NestJS
 
-3. **Deploy**
-   - Staging environment
-   - CI/CD
-   - Production deployment
+4. **Deploy Staging** (3-5 dias)
+   - Configurar ambiente staging
+   - CI/CD setup (GitHub Actions)
+   - Monitoramento e logs
+   - Validação completa em staging
+
+5. **Produção** (1-2 semanas)
+   - Blue-Green deployment
+   - Rollout gradual (10% → 100%)
+   - Monitoramento 24/7
+   - Desativação Laravel
 
 ---
 

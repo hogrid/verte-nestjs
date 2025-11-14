@@ -67,8 +67,24 @@ export class WhatsappService {
         this.logger.log('✅ Número criado', { number_id: number.id });
       }
 
-      // Start WAHA session
-      await this.wahaService.startSession(number.instance);
+      // Verificar se sessão já existe no WAHA
+      let sessionExists = false;
+      try {
+        await this.wahaService.getSessionStatus(number.instance);
+        sessionExists = true;
+        this.logger.log('ℹ️ Sessão WAHA já existe', {
+          instance: number.instance,
+        });
+      } catch (error) {
+        this.logger.log('ℹ️ Sessão WAHA não existe, criando...', {
+          instance: number.instance,
+        });
+      }
+
+      // Start WAHA session apenas se não existir
+      if (!sessionExists) {
+        await this.wahaService.startSession(number.instance);
+      }
 
       // Get QR Code
       const qrData = await this.wahaService.getQrCode(number.instance);
@@ -260,10 +276,20 @@ export class WhatsappService {
       const sessionStatus =
         await this.wahaService.getSessionStatus(sessionName);
 
-      return {
+      const result = {
         ...sessionStatus,
         number_id: number.id,
       };
+
+      // Log detalhado para debug
+      this.logger.log(`📊 Status retornado para frontend:`, {
+        status: result.status,
+        engine_state: (result as any).engine?.state,
+        has_me: !!result.me,
+        me_id: result.me?.id,
+      });
+
+      return result;
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao buscar status da sessão', {
         error: error instanceof Error ? error.message : String(error),
