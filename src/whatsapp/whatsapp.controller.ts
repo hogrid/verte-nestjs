@@ -56,7 +56,7 @@ export class WhatsappController {
     schema: {
       example: {
         qr: 'data:image/png;base64,...',
-        instance: 'user_1_default',
+        instance: 'default',
         number_id: 1,
       },
     },
@@ -86,7 +86,7 @@ export class WhatsappController {
         connected: true,
         status: 'WORKING',
         number: '5511999999999',
-        instance: 'user_1_default',
+        instance: 'default',
       },
     },
   })
@@ -117,7 +117,7 @@ export class WhatsappController {
         results: [
           {
             number_id: 1,
-            instance: 'user_1_default',
+            instance: 'default',
             connected: true,
             status: 'WORKING',
           },
@@ -463,7 +463,7 @@ export class WhatsappController {
             id: 1,
             user_id: 1,
             name: 'Padrão',
-            instance: 'user_1_default',
+            instance: 'default',
             status: 1,
             status_connection: 1,
             cel: '5511999999999',
@@ -504,7 +504,7 @@ export class WhatsappController {
           id: 1,
           user_id: 1,
           name: 'Padrão',
-          instance: 'user_1_default',
+          instance: 'default',
           status: 1,
           status_connection: 1,
         },

@@ -56,10 +56,12 @@ export class WhatsappService {
 
       if (!number) {
         // Create default number
+        // NOTE: WAHA Core only supports 'default' session
+        // For multiple sessions, WAHA PLUS is required
         number = this.numberRepository.create({
           user_id: userId,
           name: 'Padrão',
-          instance: `user_${userId}_default`,
+          instance: 'default',
           status: 1,
           status_connection: 0,
         });
