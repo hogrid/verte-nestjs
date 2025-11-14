@@ -9,6 +9,10 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Query,
+  Headers,
+  RawBodyRequest,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,63 +24,87 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WhatsappService } from './whatsapp.service';
-import { QrCodeDto } from './dto/qr-code.dto';
-import { DisconnectSessionDto } from './dto/disconnect-session.dto';
-import { SendPollDto } from './dto/send-poll.dto';
-import { UpdateSettingsDto } from './dto/update-settings.dto';
+import { SetupWhatsAppDto } from './dto/setup-whatsapp.dto';
+import {
+  SendTextMessageDto,
+  SendTemplateMessageDto,
+  SendImageMessageDto,
+} from './dto/send-message.dto';
+import type { WhatsAppWebhookPayload } from './dto/webhook.dto';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * WhatsappController
  *
- * Gerencia integração WhatsApp via WAHA API
- * Mantém 100% de compatibilidade com Laravel WhatsappController
+ * Gerencia integração WhatsApp via WhatsApp Cloud API (Meta/Facebook)
+ * Mantém 100% de compatibilidade com Laravel WhatsappController (quando possível)
  *
- * Total: 15 endpoints
+ * **MUDANÇA IMPORTANTE**: Não usa mais WAHA (QR Code)
+ * Agora usa WhatsApp Cloud API oficial da Meta
+ *
+ * Total: 10 endpoints principais
  */
-@ApiTags('WhatsApp Integration')
+@ApiTags('WhatsApp Cloud API')
 @Controller('api/v1')
 export class WhatsappController {
-  constructor(private readonly whatsappService: WhatsappService) {}
+  constructor(
+    private readonly whatsappService: WhatsappService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
-   * 1. GET /api/v1/connect-whatsapp
-   * Inicia processo de conexão WhatsApp (QR Code)
-   * Laravel: WhatsappController@connect
+   * 1. POST /api/v1/whatsapp/setup
+   * Configurar WhatsApp Cloud API (substitui o antigo connect com QR Code)
    */
-  @Get('connect-whatsapp')
+  @Post('whatsapp/setup')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Iniciar conexão WhatsApp',
-    description: 'Inicia processo de conexão WhatsApp gerando QR Code',
+    summary: 'Configurar WhatsApp Cloud API',
+    description:
+      'Configura WhatsApp usando Phone Number ID e Access Token da Meta. Não usa mais QR Code.',
   })
+  @ApiBody({ type: SetupWhatsAppDto })
   @ApiResponse({
     status: 200,
-    description: 'QR Code gerado com sucesso',
+    description: 'WhatsApp configurado com sucesso',
     schema: {
       example: {
-        qr: 'data:image/png;base64,...',
-        instance: 'default',
-        number_id: 1,
+        success: true,
+        message: 'WhatsApp configurado com sucesso',
+        number: {
+          id: 1,
+          name: 'WhatsApp Principal',
+          phone_number: '+5511999999999',
+          verified_name: 'Minha Empresa',
+          quality_rating: 'GREEN',
+        },
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async connect(@Request() req: { user: { id: number } }) {
-    return this.whatsappService.connect(req.user.id);
+  @ApiResponse({
+    status: 400,
+    description: 'Phone Number ID ou Access Token inválidos',
+  })
+  async setupWhatsApp(
+    @Request() req: { user: { id: number } },
+    @Body() dto: SetupWhatsAppDto,
+  ) {
+    return this.whatsappService.setupWhatsApp(req.user.id, dto);
   }
 
   /**
-   * 2. GET /api/v1/connect-whatsapp-check
-   * Verifica status de conexão WhatsApp
-   * Laravel: WhatsappController@checkConnection
+   * 2. GET /api/v1/whatsapp/status
+   * Verificar status de conexão WhatsApp
    */
-  @Get('connect-whatsapp-check')
+  @Get('whatsapp/status')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Verificar conexão WhatsApp',
-    description: 'Verifica status de conexão WhatsApp em tempo real',
+    description: 'Verifica se o WhatsApp está configurado e conectado',
   })
   @ApiResponse({
     status: 200,
@@ -84,374 +112,124 @@ export class WhatsappController {
     schema: {
       example: {
         connected: true,
-        status: 'WORKING',
-        number: '5511999999999',
-        instance: 'default',
+        phone_number: '+5511999999999',
+        verified_name: 'Minha Empresa',
+        quality_rating: 'GREEN',
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async checkConnection(@Request() req: { user: { id: number } }) {
+  async checkStatus(@Request() req: { user: { id: number } }) {
     return this.whatsappService.checkConnection(req.user.id);
   }
 
   /**
-   * 3. POST /api/v1/force-check-whatsapp-connections
-   * Força verificação de todas as conexões WhatsApp
-   * Laravel: Closure
+   * 3. POST /api/v1/whatsapp/send-text
+   * Enviar mensagem de texto
    */
-  @Post('force-check-whatsapp-connections')
+  @Post('whatsapp/send-text')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Forçar verificação de conexões',
-    description: 'Força verificação de todas as conexões WhatsApp do usuário',
+    summary: 'Enviar mensagem de texto',
+    description: 'Envia mensagem de texto via WhatsApp Cloud API',
   })
+  @ApiBody({ type: SendTextMessageDto })
   @ApiResponse({
     status: 200,
-    description: 'Verificação concluída',
+    description: 'Mensagem enviada com sucesso',
     schema: {
       example: {
-        checked: 2,
-        results: [
-          {
-            number_id: 1,
-            instance: 'default',
-            connected: true,
-            status: 'WORKING',
-          },
-        ],
+        success: true,
+        message_id: 'wamid.HBgNNjE1NTU1MTIzNDU...',
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async forceCheckConnections(@Request() req: { user: { id: number } }) {
-    return this.whatsappService.forceCheckAllConnections(req.user.id);
-  }
-
-  /**
-   * 4. POST /api/v1/waha/qr
-   * Gera QR Code para sessão WAHA
-   * Laravel: WhatsappController@getWahaQr
-   */
-  @Post('waha/qr')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Gerar QR Code WAHA',
-    description: 'Gera QR Code para sessão WAHA específica',
-  })
-  @ApiBody({ type: QrCodeDto })
-  @ApiResponse({
-    status: 200,
-    description: 'QR Code gerado',
-    schema: {
-      example: {
-        qr: 'data:image/png;base64,...',
-        instance: 'default',
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
-  async getWahaQr(
+  @ApiResponse({ status: 404, description: 'Número não encontrado' })
+  async sendTextMessage(
     @Request() req: { user: { id: number } },
-    @Body() dto: QrCodeDto,
+    @Body() dto: SendTextMessageDto,
   ) {
-    return this.whatsappService.getQrCode(req.user.id, dto.session);
+    return this.whatsappService.sendTextMessage(req.user.id, dto);
   }
 
   /**
-   * 5. GET /api/v1/waha/sessions/:sessionName
-   * Status de sessão WAHA específica
-   * Laravel: WhatsappController@getWahaSessionStatus
+   * 4. POST /api/v1/whatsapp/send-template
+   * Enviar mensagem template
    */
-  @Get('waha/sessions/:sessionName')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Status da sessão WAHA',
-    description: 'Obtém status de sessão WAHA específica',
-  })
-  @ApiParam({
-    name: 'sessionName',
-    description: 'Nome da sessão WAHA',
-    example: 'default',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Status obtido com sucesso',
-    schema: {
-      example: {
-        name: 'default',
-        status: 'WORKING',
-        me: {
-          id: '5511999999999',
-          pushName: 'User Name',
-        },
-        number_id: 1,
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
-  async getSessionStatus(
-    @Request() req: { user: { id: number } },
-    @Param('sessionName') sessionName: string,
-  ) {
-    return this.whatsappService.getSessionStatus(req.user.id, sessionName);
-  }
-
-  /**
-   * 6. POST /api/v1/waha/disconnect
-   * Desconecta sessão WAHA (autenticado)
-   * Laravel: WhatsappController@disconnectWahaSession
-   */
-  @Post('waha/disconnect')
+  @Post('whatsapp/send-template')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Desconectar sessão WAHA',
-    description: 'Desconecta sessão WAHA específica (requer autenticação)',
+    summary: 'Enviar mensagem template',
+    description:
+      'Envia mensagem template aprovada via WhatsApp Cloud API (necessário para iniciar conversa)',
   })
-  @ApiBody({ type: DisconnectSessionDto })
+  @ApiBody({ type: SendTemplateMessageDto })
   @ApiResponse({
     status: 200,
-    description: 'Sessão desconectada',
+    description: 'Template enviado com sucesso',
     schema: {
       example: {
         success: true,
-        message: 'Sessão desconectada com sucesso',
+        message_id: 'wamid.HBgNNjE1NTU1MTIzNDU...',
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
-  async disconnectSession(
+  @ApiResponse({ status: 404, description: 'Número não encontrado' })
+  async sendTemplateMessage(
     @Request() req: { user: { id: number } },
-    @Body() dto: DisconnectSessionDto,
+    @Body() dto: SendTemplateMessageDto,
   ) {
-    return this.whatsappService.disconnectSession(req.user.id, dto.session);
+    return this.whatsappService.sendTemplateMessage(req.user.id, dto);
   }
 
   /**
-   * 7. POST /api/v1/disconnect-waha-session
-   * Desconecta sessão WAHA (público)
-   * Laravel: WhatsappController@disconnectWahaSession
+   * 5. POST /api/v1/whatsapp/send-image
+   * Enviar mensagem com imagem
    */
-  @Post('disconnect-waha-session')
+  @Post('whatsapp/send-image')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Desconectar sessão WAHA (público)',
-    description: 'Endpoint público para desconectar sessão WAHA',
+    summary: 'Enviar mensagem com imagem',
+    description: 'Envia mensagem com imagem via WhatsApp Cloud API',
   })
-  @ApiBody({ type: DisconnectSessionDto })
+  @ApiBody({ type: SendImageMessageDto })
   @ApiResponse({
     status: 200,
-    description: 'Sessão desconectada',
+    description: 'Imagem enviada com sucesso',
     schema: {
       example: {
         success: true,
-        message: 'Sessão desconectada com sucesso',
+        message_id: 'wamid.HBgNNjE1NTU1MTIzNDU...',
       },
     },
   })
-  async disconnectSessionPublic(@Body() dto: DisconnectSessionDto) {
-    // For public endpoint, we don't have userId
-    // In Laravel this is handled differently
-    // For now, disconnect by session name only
-    return {
-      success: true,
-      message: 'Endpoint público - use POST /api/v1/waha/disconnect',
-    };
-  }
-
-  /**
-   * 8. POST /api/v1/webhook-whatsapp
-   * Webhook para eventos WhatsApp
-   * Laravel: WhatsappController@webhook
-   */
-  @Post('webhook-whatsapp')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Webhook WhatsApp',
-    description: 'Recebe eventos do WhatsApp via WAHA',
-  })
-  @ApiBody({
-    description: 'Payload do webhook WAHA',
-    schema: {
-      type: 'object',
-      properties: {
-        event: { type: 'string', example: 'message' },
-        session: { type: 'string', example: 'default' },
-        payload: { type: 'object' },
-      },
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Webhook processado',
-    schema: {
-      example: {
-        success: true,
-        message: 'Webhook processado',
-      },
-    },
-  })
-  async webhook(@Body() payload: unknown) {
-    return this.whatsappService.handleWebhook(payload);
-  }
-
-  /**
-   * 9. POST /api/v1/webhook-whatsapp-extractor
-   * Webhook para extração de dados WhatsApp
-   * Laravel: WhatsappController@webhookExtractor
-   */
-  @Post('webhook-whatsapp-extractor')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Webhook extrator WhatsApp',
-    description: 'Webhook para extração de dados WhatsApp',
-  })
-  @ApiBody({
-    description: 'Payload do webhook extrator',
-    schema: {
-      type: 'object',
-    },
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Webhook processado',
-    schema: {
-      example: {
-        success: true,
-        message: 'Webhook processado',
-      },
-    },
-  })
-  async webhookExtractor(@Body() payload: unknown) {
-    return this.whatsappService.handleWebhook(payload);
-  }
-
-  /**
-   * 10. POST /api/v1/whatsapp/:instance/poll
-   * Envia enquete via WhatsApp
-   * Laravel: WhatsappController@sendPoll
-   */
-  @Post('whatsapp/:instance/poll')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Enviar enquete WhatsApp',
-    description: 'Envia enquete via WhatsApp para número específico',
-  })
-  @ApiParam({
-    name: 'instance',
-    description: 'Nome da instância WAHA',
-    example: 'default',
-  })
-  @ApiBody({ type: SendPollDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Enquete enviada',
-    schema: {
-      example: {
-        success: true,
-        message_id: 'msg_id_123',
-      },
-    },
-  })
-  @ApiResponse({ status: 400, description: 'Dados inválidos' })
-  async sendPoll(
-    @Param('instance') instance: string,
-    @Body() dto: SendPollDto,
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Número não encontrado' })
+  async sendImageMessage(
+    @Request() req: { user: { id: number } },
+    @Body() dto: SendImageMessageDto,
   ) {
-    return this.whatsappService.sendPoll(instance, dto);
+    return this.whatsappService.sendImageMessage(req.user.id, dto);
   }
 
   /**
-   * 11. GET /api/v1/whatsapp/:instance/settings
-   * Obtém configurações da instância WhatsApp
-   * Laravel: WhatsappController@getSettings
-   */
-  @Get('whatsapp/:instance/settings')
-  @ApiOperation({
-    summary: 'Obter configurações da instância',
-    description: 'Obtém configurações da instância WhatsApp',
-  })
-  @ApiParam({
-    name: 'instance',
-    description: 'Nome da instância WAHA',
-    example: 'default',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Configurações obtidas',
-    schema: {
-      example: {
-        reject_call: false,
-        groups_ignore: false,
-        always_online: false,
-        read_messages: false,
-        read_status: false,
-        sync_full_history: false,
-      },
-    },
-  })
-  async getSettings(@Param('instance') instance: string) {
-    return this.whatsappService.getSettings(instance);
-  }
-
-  /**
-   * 12. POST /api/v1/whatsapp/:instance/settings
-   * Atualiza configurações da instância WhatsApp
-   * Laravel: WhatsappController@setSettings
-   */
-  @Post('whatsapp/:instance/settings')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Atualizar configurações da instância',
-    description: 'Atualiza configurações da instância WhatsApp',
-  })
-  @ApiParam({
-    name: 'instance',
-    description: 'Nome da instância WAHA',
-    example: 'default',
-  })
-  @ApiBody({ type: UpdateSettingsDto })
-  @ApiResponse({
-    status: 200,
-    description: 'Configurações atualizadas',
-    schema: {
-      example: {
-        success: true,
-        settings: {
-          reject_call: false,
-          groups_ignore: false,
-        },
-      },
-    },
-  })
-  async updateSettings(
-    @Param('instance') instance: string,
-    @Body() dto: UpdateSettingsDto,
-  ) {
-    return this.whatsappService.updateSettings(instance, dto);
-  }
-
-  /**
-   * 13. GET /api/v1/numbers
-   * Lista números WhatsApp do usuário
-   * Laravel: WhatsappController@index
+   * 6. GET /api/v1/numbers
+   * Listar números WhatsApp do usuário
    */
   @Get('numbers')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Listar números WhatsApp',
-    description: 'Lista todos os números WhatsApp do usuário',
+    description: 'Lista todos os números WhatsApp configurados pelo usuário',
   })
   @ApiResponse({
     status: 200,
@@ -461,12 +239,11 @@ export class WhatsappController {
         data: [
           {
             id: 1,
-            user_id: 1,
-            name: 'Padrão',
-            instance: 'default',
+            name: 'WhatsApp Principal',
+            phone_number: '+5511999999999',
             status: 1,
             status_connection: 1,
-            cel: '5511999999999',
+            created_at: '2024-01-01T00:00:00.000Z',
           },
         ],
         count: 1,
@@ -479,9 +256,8 @@ export class WhatsappController {
   }
 
   /**
-   * 14. GET /api/v1/numbers/:number
-   * Mostra detalhes de número WhatsApp
-   * Laravel: WhatsappController@show
+   * 7. GET /api/v1/numbers/:number
+   * Mostrar detalhes de número WhatsApp
    */
   @Get('numbers/:number')
   @UseGuards(JwtAuthGuard)
@@ -502,11 +278,12 @@ export class WhatsappController {
       example: {
         data: {
           id: 1,
-          user_id: 1,
-          name: 'Padrão',
-          instance: 'default',
+          name: 'WhatsApp Principal',
+          phone_number: '+5511999999999',
           status: 1,
           status_connection: 1,
+          created_at: '2024-01-01T00:00:00.000Z',
+          updated_at: '2024-01-01T00:00:00.000Z',
         },
       },
     },
@@ -521,9 +298,8 @@ export class WhatsappController {
   }
 
   /**
-   * 15. DELETE /api/v1/numbers/:number
-   * Remove número WhatsApp
-   * Laravel: WhatsappController@destroy
+   * 8. DELETE /api/v1/numbers/:number
+   * Remover número WhatsApp
    */
   @Delete('numbers/:number')
   @UseGuards(JwtAuthGuard)
@@ -554,5 +330,80 @@ export class WhatsappController {
     @Param('number') numberId: number,
   ) {
     return this.whatsappService.removeNumber(req.user.id, numberId);
+  }
+
+  /**
+   * 9. GET /api/v1/whatsapp/webhook (Verification)
+   * Verificação de webhook do WhatsApp Cloud API
+   * https://developers.facebook.com/docs/graph-api/webhooks/getting-started
+   */
+  @Get('whatsapp/webhook')
+  @ApiOperation({
+    summary: 'Verificação de webhook WhatsApp',
+    description:
+      'Endpoint de verificação do webhook (chamado pela Meta ao configurar webhook)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Verificação bem-sucedida',
+  })
+  async verifyWebhook(
+    @Query('hub.mode') mode: string,
+    @Query('hub.verify_token') token: string,
+    @Query('hub.challenge') challenge: string,
+  ) {
+    const verifyToken = this.configService.get<string>(
+      'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
+      'verte_webhook_token_2024',
+    );
+
+    if (mode === 'subscribe' && token === verifyToken) {
+      console.log('✅ Webhook verified successfully');
+      return challenge;
+    } else {
+      console.log('❌ Webhook verification failed');
+      return 'Verification failed';
+    }
+  }
+
+  /**
+   * 10. POST /api/v1/whatsapp/webhook
+   * Receber eventos do WhatsApp Cloud API
+   */
+  @Post('whatsapp/webhook')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Webhook WhatsApp Cloud API',
+    description: 'Recebe eventos do WhatsApp (mensagens recebidas, status, etc)',
+  })
+  @ApiBody({
+    description: 'Payload do webhook WhatsApp Cloud API',
+    schema: {
+      type: 'object',
+      properties: {
+        object: { type: 'string', example: 'whatsapp_business_account' },
+        entry: { type: 'array' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Webhook processado',
+    schema: {
+      example: {
+        success: true,
+        message: 'Webhook processado',
+      },
+    },
+  })
+  async handleWebhook(
+    @Body() payload: WhatsAppWebhookPayload,
+    @Headers('x-hub-signature-256') signature: string,
+  ) {
+    // TODO: Validar assinatura do webhook para segurança
+    // const appSecret = this.configService.get<string>('WHATSAPP_APP_SECRET');
+    // this.whatsappCloudService.validateWebhookSignature(JSON.stringify(payload), signature, appSecret);
+
+    return this.whatsappService.handleWebhook(payload);
   }
 }

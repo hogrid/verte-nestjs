@@ -18,8 +18,18 @@ Backend NestJS do sistema **Verte** - Plataforma de automação de marketing via
 - **121/121 endpoints** implementados
 - **415+ cenários de teste E2E** (100% passando)
 - **22+ tabelas** MySQL compartilhadas com Laravel
-- **Integrações**: WAHA (WhatsApp), Stripe, MercadoPago
+- **Integrações**: **WhatsApp Cloud API** (Meta), Stripe, MercadoPago
 - **100% compatibilidade** Laravel (responses idênticos, validações em português)
+
+### ⚡ Mudança Importante: WhatsApp Cloud API
+
+**Migrado de WAHA para WhatsApp Cloud API oficial da Meta**
+
+**Vantagens:**
+- ✅ Múltiplas sessões (cada usuário tem seu próprio Phone Number ID)
+- ✅ Não precisa de QR Code (usa Phone Number ID + Access Token)
+- ✅ Mais estável e seguro (API oficial da Meta)
+- ✅ Não requer servidor adicional (WAHA)
 
 ### 📦 Módulos Implementados
 
@@ -73,9 +83,10 @@ JWT_EXPIRATION=3600
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 
-# WAHA (WhatsApp)
-WAHA_URL=http://localhost:8080
-API_WHATSAPP_GLOBALKEY=your-global-key
+# WhatsApp Cloud API (Meta/Facebook)
+# Cada usuário configura seu próprio Phone Number ID + Access Token via interface
+WHATSAPP_API_VERSION=v21.0
+WHATSAPP_WEBHOOK_VERIFY_TOKEN=verte_webhook_token_2024
 ```
 
 **⚠️ NÃO criar novas tabelas! Use o banco existente do Laravel.**

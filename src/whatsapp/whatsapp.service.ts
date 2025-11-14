@@ -9,23 +9,29 @@ import { Repository } from 'typeorm';
 import { Number } from '../database/entities/number.entity';
 import { MessageByContact } from '../database/entities/message-by-contact.entity';
 import { PublicByContact } from '../database/entities/public-by-contact.entity';
-import { WahaService } from './waha.service';
-import { UpdateSettingsDto } from './dto/update-settings.dto';
-import { SendPollDto } from './dto/send-poll.dto';
+import { WhatsAppCloudService } from './whatsapp-cloud.service';
+import { SetupWhatsAppDto } from './dto/setup-whatsapp.dto';
 import {
-  WahaWebhookEvent,
-  MessageAckPayload,
-  MessageSentPayload,
-  SessionStatusPayload,
-  MessageAckStatus,
-  getAckStatusText,
-} from './dto/webhook-event.dto';
+  SendTextMessageDto,
+  SendTemplateMessageDto,
+  SendImageMessageDto,
+} from './dto/send-message.dto';
+import {
+  WhatsAppWebhookPayload,
+  WhatsAppMessage,
+  WhatsAppStatus,
+} from './dto/webhook.dto';
 
 /**
  * WhatsappService
  *
  * Service para gerenciar lógica de negócio WhatsApp
- * Mantém 100% de compatibilidade com Laravel WhatsappController
+ * Agora usa WhatsApp Cloud API (Meta) em vez de WAHA
+ *
+ * Vantagens:
+ * - ✅ Suporta múltiplas sessões (cada usuário pode ter seu próprio Phone Number ID)
+ * - ✅ Não precisa de QR Code (usa Phone Number ID + Access Token da Meta)
+ * - ✅ Mais estável e seguro (API oficial)
  */
 @Injectable()
 export class WhatsappService {
@@ -38,82 +44,86 @@ export class WhatsappService {
     private readonly messageByContactRepository: Repository<MessageByContact>,
     @InjectRepository(PublicByContact)
     private readonly publicByContactRepository: Repository<PublicByContact>,
-    private readonly wahaService: WahaService,
+    private readonly whatsappCloudService: WhatsAppCloudService,
   ) {}
 
   /**
-   * Connect WhatsApp - Start connection process
-   * Laravel: WhatsappController@connect
+   * Setup WhatsApp - Configura Phone Number ID e Access Token
+   * Substitui o antigo método connect() que usava QR Code
    */
-  async connect(userId: number) {
-    this.logger.log('🔌 Iniciando conexão WhatsApp', { userId });
+  async setupWhatsApp(userId: number, dto: SetupWhatsAppDto) {
+    this.logger.log('🔌 Configurando WhatsApp Cloud API', { userId });
 
     try {
-      // Get active number or create new one
+      // Verificar se o Phone Number ID é válido
+      const phoneInfo = await this.whatsappCloudService.getPhoneNumberInfo(
+        dto.phone_number_id,
+        dto.access_token,
+      );
+
+      this.logger.log('✅ Phone Number ID válido', {
+        verified_name: phoneInfo.verified_name,
+        display_phone_number: phoneInfo.display_phone_number,
+      });
+
+      // Verificar se já existe um número ativo para este usuário
       let number = await this.numberRepository.findOne({
         where: { user_id: userId, status: 1 },
       });
 
       if (!number) {
-        // Create default number
-        // NOTE: WAHA Core only supports 'default' session
-        // For multiple sessions, WAHA PLUS is required
+        // Criar novo número
         number = this.numberRepository.create({
           user_id: userId,
-          name: 'Padrão',
-          instance: 'default',
+          name: dto.name || phoneInfo.verified_name || 'WhatsApp Principal',
+          instance: dto.phone_number_id, // Usar Phone Number ID como instance
           status: 1,
-          status_connection: 0,
+          status_connection: 1, // Já conectado pois tem access token válido
+          cel: phoneInfo.display_phone_number,
+          token_wpp: dto.access_token,
+          token_wpp_expiresin: null, // System User Token não expira
         });
-        await this.numberRepository.save(number);
-        this.logger.log('✅ Número criado', { number_id: number.id });
+      } else {
+        // Atualizar número existente
+        number.instance = dto.phone_number_id;
+        number.status_connection = 1;
+        number.cel = phoneInfo.display_phone_number;
+        number.token_wpp = dto.access_token;
+        number.token_wpp_expiresin = null;
+        if (dto.name) {
+          number.name = dto.name;
+        }
       }
 
-      // Verificar se sessão já existe no WAHA
-      let sessionExists = false;
-      try {
-        await this.wahaService.getSessionStatus(number.instance);
-        sessionExists = true;
-        this.logger.log('ℹ️ Sessão WAHA já existe', {
-          instance: number.instance,
-        });
-      } catch (error) {
-        this.logger.log('ℹ️ Sessão WAHA não existe, criando...', {
-          instance: number.instance,
-        });
-      }
+      await this.numberRepository.save(number);
 
-      // Start WAHA session apenas se não existir
-      if (!sessionExists) {
-        await this.wahaService.startSession(number.instance);
-      }
-
-      // Get QR Code
-      const qrData = await this.wahaService.getQrCode(number.instance);
-
-      // Update number with QR Code
-      await this.numberRepository.update(number.id, {
-        qrcode: qrData.qr,
+      this.logger.log('✅ WhatsApp configurado com sucesso', {
+        number_id: number.id,
       });
-
-      this.logger.log('✅ QR Code gerado', { number_id: number.id });
 
       return {
-        qr: qrData.qr,
-        instance: number.instance,
-        number_id: number.id,
+        success: true,
+        message: 'WhatsApp configurado com sucesso',
+        number: {
+          id: number.id,
+          name: number.name,
+          phone_number: phoneInfo.display_phone_number,
+          verified_name: phoneInfo.verified_name,
+          quality_rating: phoneInfo.quality_rating,
+        },
       };
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao conectar WhatsApp', {
+      this.logger.error('❌ Erro ao configurar WhatsApp', {
         error: error instanceof Error ? error.message : String(error),
       });
-      throw error;
+      throw new BadRequestException(
+        'Phone Number ID ou Access Token inválidos. Verifique suas credenciais.',
+      );
     }
   }
 
   /**
    * Check connection status
-   * Laravel: WhatsappController@checkConnection
    */
   async checkConnection(userId: number) {
     this.logger.log('🔍 Verificando conexão WhatsApp', { userId });
@@ -130,30 +140,43 @@ export class WhatsappService {
         };
       }
 
-      // Check WAHA session status
-      const sessionStatus = await this.wahaService.getSessionStatus(
-        number.instance,
-      );
+      if (!number.token_wpp || !number.instance) {
+        return {
+          connected: false,
+          message: 'WhatsApp não configurado',
+        };
+      }
 
-      const isConnected = sessionStatus.status === 'WORKING';
+      // Verificar se o token ainda é válido
+      try {
+        const phoneInfo = await this.whatsappCloudService.getPhoneNumberInfo(
+          number.instance,
+          number.token_wpp,
+        );
 
-      // Update database
-      await this.numberRepository.update(number.id, {
-        status_connection: isConnected ? 1 : 0,
-        cel: sessionStatus.me?.id || number.cel,
-      });
+        // Atualizar status de conexão
+        await this.numberRepository.update(number.id, {
+          status_connection: 1,
+          cel: phoneInfo.display_phone_number,
+        });
 
-      this.logger.log('✅ Status verificado', {
-        number_id: number.id,
-        connected: isConnected,
-      });
+        return {
+          connected: true,
+          phone_number: phoneInfo.display_phone_number,
+          verified_name: phoneInfo.verified_name,
+          quality_rating: phoneInfo.quality_rating,
+        };
+      } catch (error) {
+        // Token inválido ou expirado
+        await this.numberRepository.update(number.id, {
+          status_connection: 0,
+        });
 
-      return {
-        connected: isConnected,
-        status: sessionStatus.status,
-        number: sessionStatus.me?.id,
-        instance: number.instance,
-      };
+        return {
+          connected: false,
+          message: 'Access Token inválido ou expirado',
+        };
+      }
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao verificar conexão', {
         error: error instanceof Error ? error.message : String(error),
@@ -167,242 +190,130 @@ export class WhatsappService {
   }
 
   /**
-   * Force check all connections
-   * Laravel: WhatsappController (Closure)
+   * Send text message
    */
-  async forceCheckAllConnections(userId: number) {
-    this.logger.log('🔄 Forçando verificação de todas as conexões', { userId });
+  async sendTextMessage(userId: number, dto: SendTextMessageDto) {
+    this.logger.log('📤 Enviando mensagem de texto', { userId, dto });
 
     try {
-      const numbers = await this.numberRepository.find({
-        where: { user_id: userId },
-      });
-
-      const results = [];
-
-      for (const number of numbers) {
-        try {
-          const sessionStatus = await this.wahaService.getSessionStatus(
-            number.instance,
-          );
-
-          const isConnected = sessionStatus.status === 'WORKING';
-
-          await this.numberRepository.update(number.id, {
-            status_connection: isConnected ? 1 : 0,
-          });
-
-          results.push({
-            number_id: number.id,
-            instance: number.instance,
-            connected: isConnected,
-            status: sessionStatus.status,
-          });
-        } catch (error: unknown) {
-          results.push({
-            number_id: number.id,
-            instance: number.instance,
-            connected: false,
-            error: error instanceof Error ? error.message : 'Erro desconhecido',
-          });
-        }
-      }
-
-      this.logger.log('✅ Verificação completa', { count: results.length });
-
-      return {
-        checked: results.length,
-        results,
-      };
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao verificar conexões', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Get QR Code for specific session
-   * Laravel: WhatsappController@getWahaQr
-   */
-  async getQrCode(userId: number, session: string) {
-    this.logger.log('📱 Gerando QR Code', { userId, session });
-
-    try {
-      // Find number by instance name
+      // Buscar número do usuário
       const number = await this.numberRepository.findOne({
-        where: { user_id: userId, instance: session },
+        where: { id: dto.number_id, user_id: userId },
       });
 
       if (!number) {
-        throw new NotFoundException('Sessão não encontrada');
+        throw new NotFoundException('Número não encontrado');
       }
 
-      // Get QR Code from WAHA
-      const qrData = await this.wahaService.getQrCode(session);
-
-      // Update number
-      await this.numberRepository.update(number.id, {
-        qrcode: qrData.qr,
-      });
-
-      return {
-        qr: qrData.qr,
-        instance: session,
-      };
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao gerar QR Code', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Get session status
-   * Laravel: WhatsappController@getWahaSessionStatus
-   */
-  async getSessionStatus(userId: number, sessionName: string) {
-    this.logger.log('🔍 Buscando status da sessão', { userId, sessionName });
-
-    try {
-      const number = await this.numberRepository.findOne({
-        where: { user_id: userId, instance: sessionName },
-      });
-
-      if (!number) {
-        throw new NotFoundException('Sessão não encontrada');
+      if (!number.token_wpp || !number.instance) {
+        throw new BadRequestException(
+          'WhatsApp não configurado. Configure primeiro.',
+        );
       }
 
-      const sessionStatus =
-        await this.wahaService.getSessionStatus(sessionName);
-
-      const result = {
-        ...sessionStatus,
-        number_id: number.id,
-      };
-
-      // Log detalhado para debug
-      this.logger.log(`📊 Status retornado para frontend:`, {
-        status: result.status,
-        engine_state: (result as any).engine?.state,
-        has_me: !!result.me,
-        me_id: result.me?.id,
-      });
-
-      return result;
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao buscar status da sessão', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Disconnect WAHA session
-   * Laravel: WhatsappController@disconnectWahaSession
-   */
-  async disconnectSession(userId: number, session: string) {
-    this.logger.log('🚪 Desconectando sessão', { userId, session });
-
-    try {
-      const number = await this.numberRepository.findOne({
-        where: { user_id: userId, instance: session },
-      });
-
-      if (!number) {
-        throw new NotFoundException('Sessão não encontrada');
-      }
-
-      // Logout from WAHA
-      await this.wahaService.logoutSession(session);
-
-      // Update database
-      await this.numberRepository.update(number.id, {
-        status_connection: 0,
-        qrcode: null,
-      });
-
-      this.logger.log('✅ Sessão desconectada', { number_id: number.id });
-
-      return {
-        success: true,
-        message: 'Sessão desconectada com sucesso',
-      };
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao desconectar sessão', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Send poll via WhatsApp
-   * Laravel: WhatsappController@sendPoll
-   */
-  async sendPoll(instance: string, dto: SendPollDto) {
-    this.logger.log('📊 Enviando enquete', { instance });
-
-    try {
-      const result = await this.wahaService.sendPoll(instance, dto.number, {
-        name: dto.name,
-        options: dto.options,
-        selectableCount: dto.selectableCount,
-      });
-
-      return {
-        success: true,
-        message_id: result.id,
-      };
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao enviar enquete', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Get instance settings
-   * Laravel: WhatsappController@getSettings
-   */
-  async getSettings(instance: string) {
-    this.logger.log('⚙️ Buscando configurações', { instance });
-
-    try {
-      const settings = await this.wahaService.getSettings(instance);
-
-      return settings;
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao buscar configurações', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * Update instance settings
-   * Laravel: WhatsappController@setSettings
-   */
-  async updateSettings(instance: string, dto: UpdateSettingsDto) {
-    this.logger.log('⚙️ Atualizando configurações', { instance });
-
-    try {
-      const settings = await this.wahaService.updateSettings(
-        instance,
-        dto as Record<string, unknown>,
+      // Enviar mensagem via WhatsApp Cloud API
+      const result = await this.whatsappCloudService.sendTextMessage(
+        number.instance,
+        number.token_wpp,
+        dto.to,
+        dto.text,
       );
 
+      this.logger.log('✅ Mensagem enviada', { messageId: result.messageId });
+
       return {
         success: true,
-        settings,
+        message_id: result.messageId,
       };
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao atualizar configurações', {
+      this.logger.error('❌ Erro ao enviar mensagem', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Send template message
+   */
+  async sendTemplateMessage(userId: number, dto: SendTemplateMessageDto) {
+    this.logger.log('📤 Enviando template', { userId, dto });
+
+    try {
+      const number = await this.numberRepository.findOne({
+        where: { id: dto.number_id, user_id: userId },
+      });
+
+      if (!number) {
+        throw new NotFoundException('Número não encontrado');
+      }
+
+      if (!number.token_wpp || !number.instance) {
+        throw new BadRequestException(
+          'WhatsApp não configurado. Configure primeiro.',
+        );
+      }
+
+      const result = await this.whatsappCloudService.sendTemplateMessage(
+        number.instance,
+        number.token_wpp,
+        dto.to,
+        dto.template_name,
+        dto.language_code || 'pt_BR',
+        dto.parameters,
+      );
+
+      this.logger.log('✅ Template enviado', { messageId: result.messageId });
+
+      return {
+        success: true,
+        message_id: result.messageId,
+      };
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao enviar template', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Send image message
+   */
+  async sendImageMessage(userId: number, dto: SendImageMessageDto) {
+    this.logger.log('🖼️ Enviando imagem', { userId, dto });
+
+    try {
+      const number = await this.numberRepository.findOne({
+        where: { id: dto.number_id, user_id: userId },
+      });
+
+      if (!number) {
+        throw new NotFoundException('Número não encontrado');
+      }
+
+      if (!number.token_wpp || !number.instance) {
+        throw new BadRequestException(
+          'WhatsApp não configurado. Configure primeiro.',
+        );
+      }
+
+      const result = await this.whatsappCloudService.sendImageMessage(
+        number.instance,
+        number.token_wpp,
+        dto.to,
+        dto.image_url,
+        dto.caption,
+      );
+
+      this.logger.log('✅ Imagem enviada', { messageId: result.messageId });
+
+      return {
+        success: true,
+        message_id: result.messageId,
+      };
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao enviar imagem', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
@@ -411,7 +322,6 @@ export class WhatsappService {
 
   /**
    * List user numbers
-   * Laravel: WhatsappController@index
    */
   async listNumbers(userId: number) {
     this.logger.log('📋 Listando números', { userId });
@@ -423,7 +333,14 @@ export class WhatsappService {
       });
 
       return {
-        data: numbers,
+        data: numbers.map((n) => ({
+          id: n.id,
+          name: n.name,
+          phone_number: n.cel,
+          status: n.status,
+          status_connection: n.status_connection,
+          created_at: n.created_at,
+        })),
         count: numbers.length,
       };
     } catch (error: unknown) {
@@ -436,7 +353,6 @@ export class WhatsappService {
 
   /**
    * Show number details
-   * Laravel: WhatsappController@show
    */
   async showNumber(userId: number, numberId: number) {
     this.logger.log('🔍 Buscando número', { userId, numberId });
@@ -451,7 +367,15 @@ export class WhatsappService {
       }
 
       return {
-        data: number,
+        data: {
+          id: number.id,
+          name: number.name,
+          phone_number: number.cel,
+          status: number.status,
+          status_connection: number.status_connection,
+          created_at: number.created_at,
+          updated_at: number.updated_at,
+        },
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao buscar número', {
@@ -463,7 +387,6 @@ export class WhatsappService {
 
   /**
    * Remove number (soft delete)
-   * Laravel: WhatsappController@destroy
    */
   async removeNumber(userId: number, numberId: number) {
     this.logger.log('🗑️ Removendo número', { userId, numberId });
@@ -475,17 +398,6 @@ export class WhatsappService {
 
       if (!number) {
         throw new NotFoundException('Número não encontrado');
-      }
-
-      // Disconnect session if connected
-      if (number.status_connection === 1) {
-        try {
-          await this.wahaService.logoutSession(number.instance);
-        } catch (error: unknown) {
-          this.logger.warn('⚠️ Erro ao desconectar sessão ao remover', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
       }
 
       // Soft delete
@@ -506,52 +418,46 @@ export class WhatsappService {
   }
 
   /**
-   * Handle webhook events from WAHA
-   * Laravel: WhatsappController@webhook
+   * Handle webhook events from WhatsApp Cloud API
    */
-  async handleWebhook(payload: unknown) {
+  async handleWebhook(payload: WhatsAppWebhookPayload) {
     try {
-      // Validar estrutura do evento
-      if (!this.isWahaWebhookEvent(payload)) {
-        this.logger.warn('⚠️ Webhook recebido com estrutura inválida', {
-          payload,
-        });
-        return {
-          success: false,
-          message: 'Estrutura de webhook inválida',
-        };
-      }
-
-      const event = payload;
-
-      this.logger.log('📥 Webhook WAHA recebido', {
-        event: event.event,
-        session: event.session,
+      this.logger.log('📥 Webhook recebido', {
+        object: payload.object,
+        entries: payload.entry.length,
       });
 
-      // Processar diferentes tipos de eventos
-      switch (event.event) {
-        case 'message.ack':
-          await this.handleMessageAck(event);
-          break;
+      if (payload.object !== 'whatsapp_business_account') {
+        this.logger.warn('⚠️ Webhook com object inválido', {
+          object: payload.object,
+        });
+        return { success: false, message: 'Object inválido' };
+      }
 
-        case 'message.sent':
-          await this.handleMessageSent(event);
-          break;
+      for (const entry of payload.entry) {
+        for (const change of entry.changes) {
+          if (change.field === 'messages') {
+            // Processar mensagens recebidas
+            if (change.value.messages) {
+              for (const message of change.value.messages) {
+                await this.processIncomingMessage(
+                  change.value.metadata.phone_number_id,
+                  message,
+                );
+              }
+            }
 
-        case 'session.status':
-          await this.handleSessionStatus(event);
-          break;
-
-        case 'message.any':
-          // Log para debug, mas não processamos aqui
-          this.logger.debug('📩 Mensagem recebida (message.any)', {
-            session: event.session,
-          });
-          break;
-
-        default:
-          this.logger.debug(`📌 Evento não tratado: ${event.event}`);
+            // Processar status de mensagens enviadas
+            if (change.value.statuses) {
+              for (const status of change.value.statuses) {
+                await this.processMessageStatus(
+                  change.value.metadata.phone_number_id,
+                  status,
+                );
+              }
+            }
+          }
+        }
       }
 
       return {
@@ -561,10 +467,8 @@ export class WhatsappService {
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar webhook', {
         error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
       });
 
-      // Não lançar erro para evitar retry infinito do WAHA
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erro desconhecido',
@@ -573,280 +477,114 @@ export class WhatsappService {
   }
 
   /**
-   * Type guard para validar estrutura de webhook WAHA
+   * Process incoming message
    */
-  private isWahaWebhookEvent(payload: unknown): payload is WahaWebhookEvent {
-    if (typeof payload !== 'object' || payload === null) {
-      return false;
-    }
+  private async processIncomingMessage(
+    phoneNumberId: string,
+    message: WhatsAppMessage,
+  ) {
+    this.logger.log('📩 Processando mensagem recebida', {
+      phoneNumberId,
+      messageId: message.id,
+      type: message.type,
+      from: message.from,
+    });
 
-    const event = payload as Record<string, unknown>;
-    return (
-      typeof event.event === 'string' &&
-      typeof event.session === 'string' &&
-      'payload' in event
-    );
+    // TODO: Implementar lógica de processamento de mensagens recebidas
+    // - Salvar no banco de dados
+    // - Disparar eventos para webhooks do usuário
+    // - Processar comandos automáticos
   }
 
   /**
-   * Handle message.ack event
-   * Atualiza status de entrega/leitura de mensagens
+   * Process message status update
    */
-  private async handleMessageAck(event: WahaWebhookEvent) {
+  private async processMessageStatus(
+    phoneNumberId: string,
+    status: WhatsAppStatus,
+  ) {
+    this.logger.log('✅ Processando status de mensagem', {
+      phoneNumberId,
+      messageId: status.id,
+      status: status.status,
+      recipientId: status.recipient_id,
+    });
+
+    // Atualizar status no banco de dados
+    const phoneNumber = status.recipient_id.replace(/\D/g, '');
+
     try {
-      const payload = event.payload as MessageAckPayload;
-
-      this.logger.log('✅ Processando message.ack', {
-        session: event.session,
-        ack: payload.ack,
-        ackText: getAckStatusText(payload.ack),
-        messageId: payload.id,
-      });
-
-      // Atualizar MessageByContact baseado no ACK status
-      const updates: Partial<MessageByContact> = {};
-
-      switch (payload.ack) {
-        case MessageAckStatus.SERVER_ACK: // 2 - Enviada ao servidor
-        case MessageAckStatus.PENDING: // 1 - Pendente
-          updates.send = 1;
-          break;
-
-        case MessageAckStatus.DELIVERY_ACK: // 3 - Entregue ao destinatário
-          updates.send = 1;
-          updates.delivered = 1;
-          break;
-
-        case MessageAckStatus.READ: // 4 - Lida pelo destinatário
-        case MessageAckStatus.PLAYED: // 5 - Reproduzida (áudio/vídeo)
-          updates.send = 1;
-          updates.delivered = 1;
-          updates.read = 1;
-          break;
-
-        case MessageAckStatus.ERROR: // 0 - Erro
-          updates.error = 'Erro ao enviar mensagem';
-          break;
-      }
-
-      // Atualizar MessageByContact (buscar pelo contact_id do número destinatário)
-      const phoneNumber = this.extractPhoneNumber(payload.to);
-      if (phoneNumber) {
-        // Atualizar somente colunas existentes no schema atual
-        const [{ db }]: any = await this.messageByContactRepository.query(
-          'SELECT DATABASE() AS db',
-        );
-        const canSetSend = await this.hasColumn(
-          db,
-          'message_by_contacts',
-          'send',
-        );
-        const canSetDelivered = await this.hasColumn(
-          db,
-          'message_by_contacts',
-          'delivered',
-        );
-        const canSetRead = await this.hasColumn(
-          db,
-          'message_by_contacts',
-          'read',
-        );
-
-        const safeUpdates: Partial<MessageByContact> = {};
-        if (canSetSend && typeof updates.send !== 'undefined')
-          safeUpdates.send = updates.send;
-        if (canSetDelivered && typeof updates.delivered !== 'undefined')
-          safeUpdates.delivered = updates.delivered;
-        if (canSetRead && typeof updates.read !== 'undefined')
-          safeUpdates.read = updates.read;
-
-        if (Object.keys(safeUpdates).length > 0) {
+      // Atualizar MessageByContact
+      switch (status.status) {
+        case 'sent':
           await this.messageByContactRepository
             .createQueryBuilder()
             .update(MessageByContact)
-            .set(safeUpdates)
+            .set({ send: 1 } as any)
             .where(
               'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
               { phone: phoneNumber },
             )
             .execute();
-        }
+          break;
 
-        // Atualizar PublicByContact se mensagem foi lida
-        if (
-          payload.ack === MessageAckStatus.READ ||
-          payload.ack === MessageAckStatus.PLAYED
-        ) {
+        case 'delivered':
+          await this.messageByContactRepository
+            .createQueryBuilder()
+            .update(MessageByContact)
+            .set({ send: 1, delivered: 1 } as any)
+            .where(
+              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
+              { phone: phoneNumber },
+            )
+            .execute();
+          break;
+
+        case 'read':
+          await this.messageByContactRepository
+            .createQueryBuilder()
+            .update(MessageByContact)
+            .set({ send: 1, delivered: 1, read: 1 } as any)
+            .where(
+              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
+              { phone: phoneNumber },
+            )
+            .execute();
+
+          // Atualizar PublicByContact também
           await this.publicByContactRepository
             .createQueryBuilder()
             .update(PublicByContact)
             .set({ read: 1 })
             .where(
               'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
-              {
-                phone: phoneNumber,
-              },
+              { phone: phoneNumber },
             )
             .execute();
-        }
+          break;
+
+        case 'failed':
+          await this.messageByContactRepository
+            .createQueryBuilder()
+            .update(MessageByContact)
+            .set({
+              error: status.errors?.[0]?.message || 'Erro ao enviar mensagem',
+            } as any)
+            .where(
+              'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
+              { phone: phoneNumber },
+            )
+            .execute();
+          break;
       }
 
-      this.logger.log('✅ message.ack processado', {
-        phone: phoneNumber,
-        updates,
+      this.logger.log('✅ Status atualizado no banco de dados', {
+        status: status.status,
       });
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar message.ack', {
+      this.logger.error('❌ Erro ao atualizar status no banco', {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }
-
-  /**
-   * Handle message.sent event
-   * Confirma que mensagem foi enviada com sucesso
-   */
-  private async handleMessageSent(event: WahaWebhookEvent) {
-    try {
-      const payload = event.payload as MessageSentPayload;
-
-      this.logger.log('📤 Processando message.sent', {
-        session: event.session,
-        messageId: payload.id,
-        to: payload.to,
-      });
-
-      const phoneNumber = this.extractPhoneNumber(payload.to);
-      if (phoneNumber) {
-        // Atualizar MessageByContact (se coluna existir)
-        const [{ db }]: any = await this.messageByContactRepository.query(
-          'SELECT DATABASE() AS db',
-        );
-        const canSetSend = await this.hasColumn(
-          db,
-          'message_by_contacts',
-          'send',
-        );
-        if (canSetSend) {
-          try {
-            await this.messageByContactRepository
-              .createQueryBuilder()
-              .update('message_by_contacts')
-              .set({ send: 1 } as any)
-              .where(
-                'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
-                { phone: phoneNumber },
-              )
-              .execute();
-          } catch (e) {
-            this.logger.warn('⚠️ Não foi possível marcar send=1 (coluna ausente?)');
-          }
-        }
-
-        // Atualizar PublicByContact (somente colunas existentes)
-        try {
-          const [{ db }]: any = await this.publicByContactRepository.query(
-            'SELECT DATABASE() AS db',
-          );
-          const canSetPbcSend = await this.hasColumn(
-            db,
-            'public_by_contacts',
-            'send',
-          );
-          const canSetPbcHasError = await this.hasColumn(
-            db,
-            'public_by_contacts',
-            'has_error',
-          );
-          const pbcUpdates: any = {};
-          if (canSetPbcSend) pbcUpdates.send = 1;
-          if (canSetPbcHasError) pbcUpdates.has_error = 0;
-          if (Object.keys(pbcUpdates).length > 0) {
-            await this.publicByContactRepository
-              .createQueryBuilder()
-              .update('public_by_contacts')
-              .set(pbcUpdates)
-              .where(
-                'contact_id IN (SELECT id FROM contacts WHERE number = :phone)',
-                {
-                  phone: phoneNumber,
-                },
-              )
-              .execute();
-          }
-        } catch (e) {
-          this.logger.warn(
-            '⚠️ Não foi possível atualizar public_by_contacts (colunas ausentes?)',
-          );
-        }
-      }
-
-      this.logger.log('✅ message.sent processado', { phone: phoneNumber });
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar message.sent', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  /**
-   * Handle session.status event
-   * Atualiza status de conexão do número WhatsApp
-   */
-  private async handleSessionStatus(event: WahaWebhookEvent) {
-    try {
-      const payload = event.payload as SessionStatusPayload;
-
-      this.logger.log('🔄 Processando session.status', {
-        session: event.session,
-        status: payload.status,
-      });
-
-      // Atualizar Number baseado no status
-      const statusConnection = payload.status === 'WORKING' ? 1 : 0;
-
-      await this.numberRepository.update(
-        { instance: event.session },
-        {
-          status_connection: statusConnection,
-          cel: payload.me?.id || null,
-        },
-      );
-
-      this.logger.log('✅ session.status processado', {
-        session: event.session,
-        connected: statusConnection === 1,
-      });
-    } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar session.status', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  /**
-   * Extract phone number from WAHA format
-   * WAHA format: "5511999999999@c.us" -> "5511999999999"
-   */
-  private extractPhoneNumber(wahaPhone: string): string | null {
-    if (!wahaPhone) return null;
-
-    // Remove @c.us ou @g.us (group)
-    const cleaned = wahaPhone.replace(/@.*$/, '');
-
-    return cleaned;
-  }
-
-  // Helper: verifica se coluna existe no schema atual (compat MySQL/MariaDB)
-  private async hasColumn(
-    dbName: string,
-    table: string,
-    column: string,
-  ): Promise<boolean> {
-    const rows = await this.messageByContactRepository.query(
-      'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1',
-      [dbName, table, column],
-    );
-    return Array.isArray(rows) && rows.length > 0;
   }
 }
