@@ -1,0 +1,46 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Build
+dist
+build
+
+# Tests
+test
+coverage
+*.spec.ts
+*.e2e-spec.ts
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Git
+.git
+.gitignore
+.github
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads (serão criados no container)
+uploads/*
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore

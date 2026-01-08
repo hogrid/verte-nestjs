@@ -1,0 +1,137 @@
+services:
+  evolution-api:
+    container_name: evolution_api
+    image: evoapicloud/evolution-api:latest
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      # API Configuration
+      - SERVER_URL=http://localhost:8080
+      - CORS_ORIGIN=*
+      - CORS_METHODS=GET,POST,PUT,DELETE
+      - CORS_CREDENTIALS=true
+
+      # Authentication
+      - AUTHENTICATION_API_KEY=change-me-to-secure-api-key
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+
+      # Database (PostgreSQL)
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://postgres:postgres@postgres:5432/evolution
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
+
+      # Redis (Cache)
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_REDIS_SAVE_INSTANCES=true
+
+      # S3 (Optional - para armazenar mídias)
+      - S3_ENABLED=false
+
+      # Webhook
+      - WEBHOOK_GLOBAL_ENABLED=false
+      - WEBHOOK_GLOBAL_URL=
+      - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
+
+      # RabbitMQ (Optional)
+      - RABBITMQ_ENABLED=false
+
+      # WebSocket
+      - WEBSOCKET_ENABLED=false
+
+      # Chatwoot Integration (Optional)
+      - CHATWOOT_ENABLED=false
+
+      # QR Code
+      - QRCODE_LIMIT=30
+      - QRCODE_COLOR=#198754
+
+      # WhatsApp Session Configuration (CRÍTICO para gerar QR Code)
+      - CONFIG_SESSION_PHONE_CLIENT=Chrome
+      - CONFIG_SESSION_PHONE_NAME=Chrome
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1028178858
+
+      # Instance Settings
+      - INSTANCE_EXPIRATION_TIME=false
+
+      # Log Level
+      - LOG_LEVEL=DEBUG
+      - LOG_COLOR=true
+      - LOG_BAILEYS=info
+
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+
+    depends_on:
+      - postgres
+      - redis
+
+    networks:
+      - VerteApp
+
+  postgres:
+    container_name: evolution_postgres
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=evolution
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Porta diferente para não conflitar com MySQL
+    networks:
+      - VerteApp
+
+  redis:
+    container_name: evolution_redis
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6380:6379"  # Porta diferente para não conflitar com Redis do NestJS
+    networks:
+      - VerteApp
+
+  db_mysql:
+    image: mysql:8.0
+    container_name: verte_mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: VerteApp
+      MYSQL_ROOT_PASSWORD: yPiS83D8iN
+    ports:
+      - "5306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - VerteApp
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  evolution_instances:
+    driver: local
+  evolution_store:
+    driver: local
+  mysql_data:
+    driver: local
+
+networks:
+  # Usar mesma rede do frontend para permitir comunicação entre serviços
+  VerteApp:
+    external: true
+    name: VerteApp
