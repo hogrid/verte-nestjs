@@ -617,22 +617,61 @@ export class ContactsService {
     const { status } = updateDto;
 
     if (!contactIds || contactIds.length === 0) {
-      throw new BadRequestException(
-        'Nenhum ID de contato fornecido.',
-      );
+      throw new BadRequestException('Nenhum ID de contato fornecido.');
     }
 
-    // SECURITY: Filter by user_id (Laravel doesn't do this - SECURITY FLAW!)
-    // This ensures users can only update their own contacts
+    this.logger.log(
+      `📝 Atualizando ${contactIds.length} contatos para status=${status} (user=${userId})`,
+    );
+    this.logger.log(`📋 TODOS os IDs recebidos (${contactIds.length} total): [${contactIds.join(', ')}]`);
+
+    // Verificar se há IDs duplicados
+    const uniqueIds = [...new Set(contactIds)];
+    if (uniqueIds.length !== contactIds.length) {
+      this.logger.warn(`⚠️ DUPLICATAS DETECTADAS! ${contactIds.length} enviados, ${uniqueIds.length} únicos`);
+    }
+
+    // DEBUG: Verificar quantos contatos existem com esses IDs SEM filtro de user_id
+    const allContactsWithIds = await this.contactRepository.find({
+      where: {
+        id: In(contactIds),
+      },
+      select: ['id', 'status', 'deleted_at', 'user_id'],
+    });
+
+    this.logger.log(`🔍 DEBUG: ${allContactsWithIds.length} contatos encontrados no banco com esses IDs (sem filtro user_id)`);
+
+    // Verificar quantos pertencem ao usuário
+    const belongsToUser = allContactsWithIds.filter(c => c.user_id === userId);
+    const belongsToOthers = allContactsWithIds.filter(c => c.user_id !== userId);
+
+    this.logger.log(`🔍 DEBUG: ${belongsToUser.length} pertencem ao user=${userId}, ${belongsToOthers.length} pertencem a OUTROS usuários`);
+
+    if (belongsToOthers.length > 0) {
+      const otherUserIds = [...new Set(belongsToOthers.map(c => c.user_id))];
+      this.logger.warn(`⚠️ IDs de outros usuários detectados: ${otherUserIds.join(', ')}`);
+    }
+
+    const alreadyWithStatus = belongsToUser.filter(c => c.status === status);
+    const canBeUpdated = belongsToUser.filter(c => c.status !== status);
+    const deletedOnes = belongsToUser.filter(c => c.deleted_at !== null);
+
+    this.logger.log(`🔍 DEBUG: ${alreadyWithStatus.length} já têm status=${status}, ${canBeUpdated.length} serão atualizados, ${deletedOnes.length} estão deletados`);
+
+    // SECURITY: Filter by user_id only
+    // Os IDs já vêm do frontend que os obteve de uma query filtrada
+    // Filtrar por user_id é suficiente para segurança (evita cross-user attack)
     const result = await this.contactRepository.update(
       {
         id: In(contactIds),
-        user_id: userId, // Security filter (not in Laravel!)
+        user_id: userId,
       },
       {
         status,
       },
     );
+
+    this.logger.log(`✅ ${result.affected} contatos atualizados com sucesso (expected: ${canBeUpdated.length})`);
 
     // Check if any contacts were updated
     if (result.affected === 0) {
@@ -648,6 +687,7 @@ export class ContactsService {
     return {
       data: {
         id: uniqueId,
+        affected: result.affected,
       },
     };
   }
@@ -668,16 +708,22 @@ export class ContactsService {
   async blockContacts(userId: number, blockDto: BlockContactsDto) {
     const { contact_ids } = blockDto;
 
-    // SECURITY: Filter by user_id to ensure users can only block their own contacts
+    this.logger.log(
+      `🚫 Bloqueando ${contact_ids.length} contatos (user=${userId})`,
+    );
+
+    // SECURITY: Filter by user_id only
     const result = await this.contactRepository.update(
       {
         id: In(contact_ids),
-        user_id: userId, // Security filter
+        user_id: userId,
       },
       {
         status: 2, // 2 = Blocked
       },
     );
+
+    this.logger.log(`✅ ${result.affected} contatos bloqueados com sucesso`);
 
     // Check if any contacts were updated
     if (result.affected === 0) {
@@ -714,16 +760,22 @@ export class ContactsService {
   async unblockContacts(userId: number, unblockDto: UnblockContactsDto) {
     const { contact_ids } = unblockDto;
 
-    // SECURITY: Filter by user_id to ensure users can only unblock their own contacts
+    this.logger.log(
+      `✅ Desbloqueando ${contact_ids.length} contatos (user=${userId})`,
+    );
+
+    // SECURITY: Filter by user_id only
     const result = await this.contactRepository.update(
       {
         id: In(contact_ids),
-        user_id: userId, // Security filter
+        user_id: userId,
       },
       {
         status: 1, // 1 = Active
       },
     );
+
+    this.logger.log(`✅ ${result.affected} contatos desbloqueados com sucesso`);
 
     // Check if any contacts were updated
     if (result.affected === 0) {
