@@ -149,6 +149,9 @@ export class ContactsController {
     },
   })
   async findAll(@Query() filters: ListContactsDto, @Request() req: any) {
+    console.log('🔍 CONTROLLER findAll chamado!');
+    console.log('🔍 userId:', req.user?.id);
+    console.log('🔍 filters recebidos:', JSON.stringify(filters));
     return this.contactsService.findAll(req.user.id, filters);
   }
 
@@ -299,6 +302,9 @@ export class ContactsController {
     @Body() updateDto: UpdateContactsStatusDto,
     @Request() req: any,
   ) {
+    console.log('🔥 CONTROLLER updateContactsStatus chamado!');
+    console.log('🔥 userId:', req.user?.id);
+    console.log('🔥 updateDto:', JSON.stringify(updateDto));
     return this.contactsService.updateContactsStatus(req.user.id, updateDto);
   }
 

@@ -13,7 +13,9 @@ import {
   Request,
   UseInterceptors,
   UploadedFile,
+  UploadedFiles,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,7 +27,7 @@ import {
   ApiConsumes,
   ApiBody,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, AnyFilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { CampaignsService } from './campaigns.service';
@@ -42,6 +44,37 @@ import { CancelMultipleCampaignsDto } from './dto/cancel-multiple-campaigns.dto'
 import { ChangeStatusDto } from './dto/change-status.dto';
 
 /**
+ * Parse FormData nested fields into object
+ * Converts flat keys like 'messages[0][text]' to nested objects
+ */
+function parseFormDataFields(body: Record<string, any>): Record<string, any> {
+  const result: Record<string, any> = {};
+
+  for (const [key, value] of Object.entries(body)) {
+    // Parse nested keys like 'messages[0][text]' or 'tags[0]'
+    const parts = key.match(/([^\[\]]+)/g);
+    if (!parts) continue;
+
+    let current: any = result;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const part = parts[i];
+      const nextPart = parts[i + 1];
+      const isNextArray = /^\d+$/.test(nextPart);
+
+      if (!(part in current)) {
+        current[part] = isNextArray ? [] : {};
+      }
+      current = current[part];
+    }
+
+    const lastPart = parts[parts.length - 1];
+    current[lastPart] = value;
+  }
+
+  return result;
+}
+
+/**
  * CampaignsController
  * Handles campaign endpoints (FASE 1: CRUD básico)
  * Maintains 100% compatibility with Laravel CampaignsController
@@ -51,6 +84,8 @@ import { ChangeStatusDto } from './dto/change-status.dto';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('JWT-auth')
 export class CampaignsController {
+  private readonly logger = new Logger(CampaignsController.name);
+
   constructor(private readonly campaignsService: CampaignsService) {}
 
   /**
@@ -260,15 +295,151 @@ Cria uma nova campanha de WhatsApp.
       },
     },
   })
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      storage: diskStorage({
+        destination: './uploads/campaigns',
+        filename: (req, file, cb) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          const ext = extname(file.originalname);
+          cb(null, `campaign-media-${uniqueSuffix}${ext}`);
+        },
+      }),
+      limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+    }),
+  )
   async create(
-    @Body() createCampaignDto: CreateCampaignDto,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: any,
     @Request() req: any,
   ) {
-    const campaign = await this.campaignsService.create(
-      req.user.id,
-      createCampaignDto,
-    );
-    return { data: campaign };
+    try {
+      this.logger.log('📥 Recebendo criação de campanha', {
+        bodyKeys: Object.keys(body || {}),
+        bodyRaw: JSON.stringify(body).substring(0, 500),
+        filesCount: files?.length || 0,
+        contentType: req.headers['content-type'],
+      });
+
+      // Parse FormData nested fields if multipart
+      let createCampaignDto: CreateCampaignDto;
+      const contentType = req.headers['content-type'] || '';
+
+      if (contentType.includes('multipart/form-data')) {
+        const parsed = parseFormDataFields(body);
+        this.logger.log('📝 Campos parseados do FormData', {
+          name: parsed.name,
+          number_id: parsed.number_id,
+          public_id: parsed.public_id,
+          type: parsed.type,
+          messagesRaw: JSON.stringify(parsed.messages).substring(0, 500),
+          messagesCount: Array.isArray(parsed.messages)
+            ? parsed.messages.length
+            : 0,
+        });
+
+        // Map frontend field names to backend DTO
+        // Note: Keep public_id as string if it's 'new', otherwise parse as number
+        const publicIdValue = parsed.public_id;
+        let publicId: number | string | undefined;
+        if (publicIdValue === 'new' || publicIdValue === undefined) {
+          publicId = publicIdValue;
+        } else {
+          publicId = parseInt(String(publicIdValue), 10);
+        }
+
+        createCampaignDto = {
+          name: parsed.name,
+          number_id: parseInt(String(parsed.number_id), 10),
+          type: parsed.type ? parseInt(String(parsed.type), 10) : 1,
+          public_id: publicId as any, // Can be number or 'new'
+          schedule_date: parsed.date_schedule || parsed.schedule_date,
+          labels: parsed.tags || parsed.labels,
+          messages: [],
+        };
+
+        // Process messages
+        if (Array.isArray(parsed.messages)) {
+          createCampaignDto.messages = parsed.messages.map(
+            (msg: any, index: number) => {
+              const message: any = {
+                message: msg.text || msg.message || '',
+                order: index,
+                type: 'text', // Default type
+              };
+
+              // Check if there's an uploaded file for this message
+              const fileFieldName = `messages[${index}][media]`;
+              const file = files?.find((f) => f.fieldname === fileFieldName);
+
+              if (file) {
+                message.media = file.path;
+                // Determine media type from mime
+                if (file.mimetype.startsWith('image/')) {
+                  message.type = 'image';
+                  message.media_type = 2;
+                } else if (file.mimetype.startsWith('audio/')) {
+                  message.type = 'audio';
+                  message.media_type = 3;
+                } else if (file.mimetype.startsWith('video/')) {
+                  message.type = 'video';
+                  message.media_type = 4;
+                } else {
+                  message.type = 'document';
+                  message.media_type = 1;
+                }
+              }
+
+              return message;
+            },
+          );
+        }
+
+        this.logger.log('✅ DTO construído', {
+          name: createCampaignDto.name,
+          number_id: createCampaignDto.number_id,
+          public_id: createCampaignDto.public_id,
+          messagesCount: createCampaignDto.messages?.length,
+          messages: JSON.stringify(createCampaignDto.messages).substring(
+            0,
+            500,
+          ),
+        });
+      } else {
+        // JSON body - use directly
+        createCampaignDto = body as CreateCampaignDto;
+      }
+
+      // Validate required fields
+      if (!createCampaignDto.name) {
+        throw new BadRequestException('O campo name é obrigatório.');
+      }
+      if (!createCampaignDto.number_id || isNaN(createCampaignDto.number_id)) {
+        throw new BadRequestException(
+          'O campo number_id é obrigatório e deve ser um número.',
+        );
+      }
+
+      this.logger.log('🚀 Chamando service.create', {
+        userId: req.user.id,
+        dto: JSON.stringify(createCampaignDto).substring(0, 500),
+      });
+
+      const campaign = await this.campaignsService.create(
+        req.user.id,
+        createCampaignDto,
+      );
+      return { data: campaign };
+    } catch (error) {
+      this.logger.error('❌ Erro ao criar campanha', {
+        error: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+      throw error;
+    }
   }
 
   /**
@@ -1061,11 +1232,9 @@ Altera o status de uma campanha específica.
     description: 'Erro de validação',
   })
   async changeStatus(@Request() req: any, @Body() dto: ChangeStatusDto) {
-    return this.campaignsService.changeStatus(
-      req.user.id,
-      dto.campaign_id,
-      dto.status,
-    );
+    // Accept both campaign_id and id (frontend sends 'id')
+    const campaignId = dto.campaign_id || dto.id;
+    return this.campaignsService.changeStatus(req.user.id, campaignId, dto.status);
   }
 
   /**

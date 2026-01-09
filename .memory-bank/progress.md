@@ -11,6 +11,12 @@
   - Frontend: Refetch automático após ações em massa.
   - Backend: `updateContactsStatus()`, `blockContacts()`, `unblockContacts()` com filtro `user_id`.
   - Backend: Logs de diagnóstico detalhados para debugging.
+- **Criação de campanhas com FormData funcionando** (09/01/2026):
+  - Backend: Controller aceita multipart/form-data com arquivos de mídia.
+  - Backend: Função `parseFormDataFields()` para parsear campos aninhados.
+  - Backend: Mapeamento automático de campos frontend→backend (date_schedule→schedule_date, tags→labels, text→message).
+  - Backend: Suporte a upload de mídia nas mensagens com detecção automática de tipo (image, audio, video, document).
+  - Service: Atualizado para usar campos `media` e `media_type` das mensagens.
 
 ## Em andamento
 - Remover logs de debug após validação em produção.

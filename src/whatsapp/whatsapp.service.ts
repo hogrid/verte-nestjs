@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Campaign } from '../database/entities/campaign.entity';
 import { MessageByContact } from '../database/entities/message-by-contact.entity';
 import { Number } from '../database/entities/number.entity';
 import { PublicByContact } from '../database/entities/public-by-contact.entity';
@@ -53,6 +54,8 @@ export class WhatsappService {
     private readonly messageByContactRepository: Repository<MessageByContact>,
     @InjectRepository(PublicByContact)
     private readonly publicByContactRepository: Repository<PublicByContact>,
+    @InjectRepository(Campaign)
+    private readonly campaignRepository: Repository<Campaign>,
     @Inject(WHATSAPP_PROVIDER)
     private readonly whatsappProvider: IWhatsAppProvider,
     private readonly instanceManager: InstanceManagerService,
@@ -770,6 +773,7 @@ export class WhatsappService {
           await this.processSessionStatus(session, data);
         } else if (event === 'message.any') {
           this.logger.log('📨 message.any recebido');
+          await this.processIncomingMessage(data);
         }
         return { success: true, message: 'Webhook processado' };
       }
@@ -1184,6 +1188,35 @@ export class WhatsappService {
       );
     }
 
+    // Atualizar estatísticas da campanha baseado no ack
+    // Buscar o message_by_contact mais recente para obter o campaign_id
+    try {
+      const mbcRow = await this.messageByContactRepository.query(
+        `SELECT mbc.id, m.campaign_id
+         FROM message_by_contacts mbc
+         INNER JOIN messages m ON mbc.message_id = m.id
+         WHERE mbc.contact_id = ?
+         ORDER BY mbc.id DESC LIMIT 1`,
+        [contactId],
+      );
+
+      const campaignId = mbcRow?.[0]?.campaign_id;
+      if (campaignId && typeof ack === 'number') {
+        // ack >= 3: delivered
+        if (ack >= 3) {
+          await this.campaignRepository.increment({ id: campaignId }, 'total_delivered', 1);
+          this.logger.debug(`📬 Campanha #${campaignId}: +1 entregue`);
+        }
+        // ack >= 4: read
+        if (ack >= 4) {
+          await this.campaignRepository.increment({ id: campaignId }, 'total_read', 1);
+          this.logger.debug(`👁️ Campanha #${campaignId}: +1 lido`);
+        }
+      }
+    } catch (error) {
+      this.logger.warn('Erro ao atualizar estatísticas da campanha:', error);
+    }
+
     // public_by_contacts flags
     const setsPbc: string[] = [];
     if (await this.columnExists('public_by_contacts', 'send')) {
@@ -1270,6 +1303,62 @@ export class WhatsappService {
         instanceName: sessionName,
         status: 'disconnected',
       });
+    }
+  }
+
+  /**
+   * Processa mensagens recebidas para rastrear interações de campanhas
+   * Quando um contato responde a uma mensagem de campanha, incrementa total_interactions
+   */
+  private async processIncomingMessage(messagePayload: any) {
+    try {
+      // Extrair número do remetente
+      const fromJid = messagePayload?.from || messagePayload?.key?.remoteJid;
+      const senderNumber = this.extractNumberFromJid(fromJid);
+
+      if (!senderNumber) return;
+
+      // Verificar se é uma mensagem recebida (não enviada por nós)
+      const fromMe = messagePayload?.key?.fromMe || messagePayload?.fromMe;
+      if (fromMe) return;
+
+      // Buscar contato pelo número
+      const contactRow = await this.publicByContactRepository.query(
+        'SELECT id FROM contacts WHERE number = ? LIMIT 1',
+        [senderNumber],
+      );
+      const contactId = contactRow?.[0]?.id;
+      if (!contactId) return;
+
+      // Buscar campanhas ativas que enviaram mensagem para este contato recentemente
+      // (últimas 24 horas para considerar como interação)
+      const result = await this.messageByContactRepository.query(
+        `SELECT DISTINCT m.campaign_id
+         FROM message_by_contacts mbc
+         INNER JOIN messages m ON mbc.message_id = m.id
+         INNER JOIN campaigns c ON m.campaign_id = c.id
+         WHERE mbc.contact_id = ?
+         AND mbc.send = 1
+         AND c.status IN (0, 1, 2)
+         AND mbc.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+         ORDER BY mbc.created_at DESC
+         LIMIT 1`,
+        [contactId],
+      );
+
+      const campaignId = result?.[0]?.campaign_id;
+      if (campaignId) {
+        await this.campaignRepository.increment(
+          { id: campaignId },
+          'total_interactions',
+          1,
+        );
+        this.logger.log(
+          `💬 Interação registrada na campanha #${campaignId} do contato ${senderNumber.substring(0, 8)}***`,
+        );
+      }
+    } catch (error) {
+      this.logger.warn('Erro ao processar mensagem recebida:', error);
     }
   }
 }

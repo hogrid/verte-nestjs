@@ -21,10 +21,8 @@ export class CreateCampaignDto {
   @IsOptional()
   type?: number = 1;
 
-  @IsNumber({}, { message: 'O campo public_id deve ser um número.' })
-  @Type(() => Number)
   @IsOptional()
-  public_id?: number;
+  public_id?: number | string; // Can be number or 'new' for default public
 
   @IsDateString({}, { message: 'O campo schedule_date deve ser uma data válida.' })
   @IsOptional()
@@ -44,6 +42,7 @@ export class CreateCampaignDto {
     message?: string;
     media?: string;
     media_type?: number;
+    type?: string;
     order?: number;
   }>;
 }

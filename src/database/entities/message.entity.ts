@@ -40,12 +40,6 @@ export class Message {
   @Column({ name: 'media_type', type: 'tinyint', nullable: true })
   media_type: number | null;
 
-  @Column({ type: 'tinyint', nullable: true, default: 0 })
-  status: number | null;
-
-  @Column({ name: 'external_id', type: 'varchar', length: 255, nullable: true })
-  external_id: string | null;
-
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 

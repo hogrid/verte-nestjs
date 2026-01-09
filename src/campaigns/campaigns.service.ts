@@ -333,61 +333,60 @@ export class CampaignsService {
       this.logger.log('✅ Campanha criada', { campaign_id: savedCampaign.id });
 
       // 7. Create Messages (TODO: handle media upload)
+      const messages = dto.messages || [];
       this.logger.log('📝 Processando mensagens', {
-        count: dto.messages.length,
+        count: messages.length,
       });
 
-      for (const [index, messageDto] of dto.messages.entries()) {
-        const mediaType = this.getMediaTypeFromString(messageDto.type);
-        const message = this.messageRepository.create({
+      if (messages.length === 0) {
+        this.logger.warn('⚠️ Nenhuma mensagem fornecida, criando mensagem padrão');
+        // Create default empty message if none provided
+        const defaultMessage = this.messageRepository.create({
           campaign_id: savedCampaign.id,
           user_id: userId,
-          message: messageDto.message,
-          type: String(mediaType), // Convert number to string for varchar compatibility
-          order: index,
-          media: null, // TODO: handle media upload in controller
+          message: '',
+          type: 1,
+          order: 0,
+          media: null,
         });
+        await this.messageRepository.save(defaultMessage);
+      } else {
+        for (const [index, messageDto] of messages.entries()) {
+          const mediaType =
+            messageDto.media_type ||
+            this.getMediaTypeFromString(messageDto.type);
+          const message = this.messageRepository.create({
+            campaign_id: savedCampaign.id,
+            user_id: userId,
+            message: messageDto.message || '',
+            type: parseInt(String(mediaType), 10) || 1,
+            order: messageDto.order ?? index,
+            media: messageDto.media || null,
+          });
 
-        await this.messageRepository.save(message);
-        this.logger.log('✅ Mensagem criada', { index, type: messageDto.type });
+          await this.messageRepository.save(message);
+          this.logger.log('✅ Mensagem criada', {
+            index,
+            type: messageDto.type,
+            media: messageDto.media ? 'yes' : 'no',
+          });
+        }
       }
 
       // 8. Dispatch queue job if campaign is pending (status=0) and no schedule
-      if (status === 0 && !dto.schedule_date) {
-        this.logger.log('📤 Enfileirando job de disparo de campanha', {
-          campaign_id: savedCampaign.id,
-        });
-
-        await this.campaignsQueue.add(
-          'process-campaign',
-          {
-            campaignId: savedCampaign.id,
-          },
-          {
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 5000,
-            },
-          },
-        );
-      } else if (status === 3 && scheduleDate) {
-        // Schedule job for future execution
-        const delay = scheduleDate.getTime() - Date.now();
-        if (delay > 0) {
-          this.logger.log('⏰ Agendando job de disparo de campanha', {
+      // Wrapped in try-catch to not fail campaign creation if Redis is unavailable
+      try {
+        if (status === 0 && !dto.schedule_date) {
+          this.logger.log('📤 Enfileirando job de disparo de campanha', {
             campaign_id: savedCampaign.id,
-            schedule_date: scheduleDate,
-            delay_ms: delay,
           });
 
-          await this.campaignsQueue.add(
+          const job = await this.campaignsQueue.add(
             'process-campaign',
             {
               campaignId: savedCampaign.id,
             },
             {
-              delay,
               attempts: 3,
               backoff: {
                 type: 'exponential',
@@ -395,7 +394,44 @@ export class CampaignsService {
               },
             },
           );
+
+          this.logger.log('✅ Job de campanha enfileirado com sucesso', {
+            campaign_id: savedCampaign.id,
+            job_id: job.id,
+            job_name: job.name,
+          });
+        } else if (status === 3 && scheduleDate) {
+          // Schedule job for future execution
+          const delay = scheduleDate.getTime() - Date.now();
+          if (delay > 0) {
+            this.logger.log('⏰ Agendando job de disparo de campanha', {
+              campaign_id: savedCampaign.id,
+              schedule_date: scheduleDate,
+              delay_ms: delay,
+            });
+
+            await this.campaignsQueue.add(
+              'process-campaign',
+              {
+                campaignId: savedCampaign.id,
+              },
+              {
+                delay,
+                attempts: 3,
+                backoff: {
+                  type: 'exponential',
+                  delay: 5000,
+                },
+              },
+            );
+          }
         }
+      } catch (queueError) {
+        // Log but don't fail - campaign was created successfully
+        this.logger.warn('⚠️ Não foi possível enfileirar job (Redis indisponível?)', {
+          campaign_id: savedCampaign.id,
+          error: queueError instanceof Error ? queueError.message : String(queueError),
+        });
       }
 
       this.logger.log('🎉 Campanha criada com sucesso', {
@@ -1113,22 +1149,66 @@ export class CampaignsService {
       // Validate state transition
       const currentStatus = campaign.status;
 
-      // Cannot change status if already canceled/finished (status = 2)
-      if (currentStatus === 2) {
+      // Cannot change status if already canceled (check both status and canceled field)
+      if (currentStatus === 2 || campaign.canceled === 1) {
         throw new BadRequestException(
           'Não é possível alterar o status de uma campanha cancelada.',
         );
       }
 
-      // Update status
+      // Update status and related fields
       campaign.status = newStatus;
+
+      // Update canceled/paused fields for frontend compatibility
+      // status 0 = active, status 1 = paused, status 2 = canceled
+      if (newStatus === 2) {
+        campaign.canceled = 1;
+        campaign.paused = 0;
+      } else if (newStatus === 1) {
+        campaign.paused = 1;
+        campaign.canceled = 0;
+      } else {
+        // status = 0 (active/resumed)
+        campaign.paused = 0;
+        campaign.canceled = 0;
+      }
+
       await this.campaignRepository.save(campaign);
 
       this.logger.log('✅ Status alterado', {
         campaignId,
         from: currentStatus,
         to: newStatus,
+        canceled: campaign.canceled,
+        paused: campaign.paused,
       });
+
+      // Se a campanha foi retomada (de pausado para ativo), enfileirar para processamento
+      if (currentStatus === 1 && newStatus === 0) {
+        this.logger.log('📤 Campanha retomada - enfileirando para processamento', {
+          campaignId,
+        });
+
+        const job = await this.campaignsQueue.add(
+          'process-campaign',
+          {
+            campaignId: campaign.id,
+          },
+          {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 2000,
+            },
+          },
+        );
+
+        this.logger.log('✅ Job de campanha enfileirado com sucesso', {
+          campaign_id: campaign.id,
+          job_id: job.id,
+          job_name: job.name,
+        });
+      }
 
       const statusFormatted = this.formatCampaignStatus(newStatus);
 

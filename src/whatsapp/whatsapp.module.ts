@@ -8,6 +8,7 @@ import { WhatsappService } from './whatsapp.service';
 import { EvolutionApiProvider } from './providers/evolution-api.provider';
 import { WHATSAPP_PROVIDER } from './providers/whatsapp-provider.interface';
 import { InstanceManagerService } from './instance-manager.service';
+import { Campaign } from '../database/entities/campaign.entity';
 import { Number } from '../database/entities/number.entity';
 import { MessageByContact } from '../database/entities/message-by-contact.entity';
 import { PublicByContact } from '../database/entities/public-by-contact.entity';
@@ -52,7 +53,7 @@ import { PublicByContact } from '../database/entities/public-by-contact.entity';
   imports: [
     ConfigModule,
     ContactsModule,
-    TypeOrmModule.forFeature([Number, MessageByContact, PublicByContact]),
+    TypeOrmModule.forFeature([Number, MessageByContact, PublicByContact, Campaign]),
   ],
   controllers: [WhatsappController, LegacyCompatController],
   providers: [

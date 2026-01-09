@@ -4,6 +4,7 @@ import { Campaign } from '../database/entities/campaign.entity';
 import { Contact } from '../database/entities/contact.entity';
 import { Configuration } from '../database/entities/configuration.entity';
 import { ContactsModule } from '../contacts/contacts.module';
+import { QueueModule } from '../queue/queue.module';
 import { UtilitiesController } from './utilities.controller';
 import { UtilitiesService } from './utilities.service';
 
@@ -13,12 +14,13 @@ import { UtilitiesService } from './utilities.service';
  * Módulo de utilitários do sistema
  * Endpoints de health, recovery, debug, sync
  *
- * Total: 19 endpoints
+ * Total: 20 endpoints (inclui queue status)
  */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Campaign, Contact, Configuration]),
     ContactsModule,
+    QueueModule, // Import for queue status monitoring
   ],
   controllers: [UtilitiesController],
   providers: [UtilitiesService],

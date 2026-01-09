@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import {
-  redisConfig,
   QUEUE_NAMES,
   bullDefaultJobOptions,
   createMockQueueProviders,
@@ -23,6 +23,7 @@ import { SimplifiedPublic } from '../database/entities/simplified-public.entity'
 import { CustomPublic } from '../database/entities/custom-public.entity';
 import { Number } from '../database/entities/number.entity';
 import { Message } from '../database/entities/message.entity';
+import { MessageByContact } from '../database/entities/message-by-contact.entity';
 import { Contact } from '../database/entities/contact.entity';
 import { Publics } from '../database/entities/publics.entity';
 
@@ -61,15 +62,30 @@ const mockProviders = isMock
       CustomPublic,
       Number,
       Message,
+      MessageByContact,
       Contact,
       Publics,
     ]),
     ...(isMock
       ? []
       : [
-          BullModule.forRoot({
-            redis: redisConfig,
-            defaultJobOptions: bullDefaultJobOptions,
+          BullModule.forRootAsync({
+            imports: [ConfigModule],
+            inject: [ConfigService],
+            useFactory: (configService: ConfigService) => ({
+              redis: {
+                host: configService.get('REDIS_HOST', '127.0.0.1'),
+                port: configService.get<number>('REDIS_PORT', 6379),
+                password: configService.get('REDIS_PASSWORD') || undefined,
+                db: configService.get<number>('REDIS_DB', 0),
+                retryStrategy: (times: number) => {
+                  const delay = Math.min(times * 50, 3000);
+                  return delay;
+                },
+                maxRetriesPerRequest: 3,
+              },
+              defaultJobOptions: bullDefaultJobOptions,
+            }),
           }),
           BullModule.registerQueue(
             { name: QUEUE_NAMES.CAMPAIGNS },

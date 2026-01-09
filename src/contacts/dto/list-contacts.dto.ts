@@ -40,5 +40,10 @@ export class ListContactsDto {
 
   @IsString()
   @IsOptional()
-  status?: string;
+  tag?: string;
+
+  // status pode ser string, número ou array - sem validação específica
+  // O tratamento é feito no service
+  @IsOptional()
+  status?: string | number | number[];
 }

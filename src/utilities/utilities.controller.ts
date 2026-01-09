@@ -7,6 +7,8 @@ import {
   Request,
   UseGuards,
   HttpCode,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,9 +18,12 @@ import {
   ApiParam,
   ApiBody,
 } from '@nestjs/swagger';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UtilitiesService } from './utilities.service';
 import { SyncContactsDto } from './dto/sync-contacts.dto';
+import { QUEUE_NAMES } from '../config/redis.config';
 
 /**
  * UtilitiesController
@@ -35,7 +40,15 @@ import { SyncContactsDto } from './dto/sync-contacts.dto';
 @ApiTags('Utilities')
 @Controller('api')
 export class UtilitiesController {
-  constructor(private readonly utilitiesService: UtilitiesService) {}
+  constructor(
+    private readonly utilitiesService: UtilitiesService,
+    @Optional()
+    @InjectQueue(QUEUE_NAMES.CAMPAIGNS)
+    private readonly campaignsQueue?: Queue,
+    @Optional()
+    @InjectQueue(QUEUE_NAMES.WHATSAPP_MESSAGE)
+    private readonly whatsappMessageQueue?: Queue,
+  ) {}
 
   /**
    * 1. GET /api/health (backward compatibility)
@@ -565,5 +578,127 @@ export class UtilitiesController {
       req.user.id,
       configurations,
     );
+  }
+
+  /**
+   * 20. GET /api/v1/queue-status
+   * Status das filas Bull/Redis
+   */
+  @Get('v1/queue-status')
+  @ApiOperation({
+    summary: 'Status das filas',
+    description: 'Retorna status das filas Bull (campaigns, whatsapp-message)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status das filas',
+    schema: {
+      example: {
+        redis_connected: true,
+        queues: {
+          campaigns: { waiting: 0, active: 0, completed: 10, failed: 0 },
+          'whatsapp-message': { waiting: 5, active: 2, completed: 100, failed: 3 },
+        },
+      },
+    },
+  })
+  async getQueueStatus() {
+    const queuesAvailable = !!this.campaignsQueue && !!this.whatsappMessageQueue;
+
+    if (!queuesAvailable) {
+      return {
+        redis_connected: false,
+        message: 'Queues não disponíveis - Redis pode estar offline ou MOCK_BULL=1',
+        timestamp: new Date().toISOString(),
+      };
+    }
+
+    try {
+      const [campaignsStatus, messagesStatus] = await Promise.all([
+        this.campaignsQueue!.getJobCounts(),
+        this.whatsappMessageQueue!.getJobCounts(),
+      ]);
+
+      // Tentar buscar jobs ativos para mais detalhes
+      const [activeJobs, waitingJobs] = await Promise.all([
+        this.campaignsQueue!.getActive(),
+        this.campaignsQueue!.getWaiting(),
+      ]);
+
+      return {
+        redis_connected: true,
+        timestamp: new Date().toISOString(),
+        queues: {
+          campaigns: {
+            ...campaignsStatus,
+            active_jobs: activeJobs.map((j) => ({
+              id: j.id,
+              data: j.data,
+              attemptsMade: j.attemptsMade,
+              timestamp: j.timestamp,
+            })),
+            waiting_jobs: waitingJobs.slice(0, 5).map((j) => ({
+              id: j.id,
+              data: j.data,
+              delay: j.opts?.delay,
+            })),
+          },
+          'whatsapp-message': messagesStatus,
+        },
+      };
+    } catch (error) {
+      return {
+        redis_connected: false,
+        error: error instanceof Error ? error.message : String(error),
+        message: 'Erro ao conectar com Redis',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  /**
+   * 21. POST /api/v1/queue-retry-campaign/:id
+   * Reprocessar campanha manualmente
+   */
+  @Post('v1/queue-retry-campaign/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Reprocessar campanha',
+    description: 'Adiciona campanha à fila para reprocessamento',
+  })
+  @ApiParam({ name: 'id', description: 'ID da campanha', example: 1 })
+  @ApiResponse({ status: 200, description: 'Campanha enfileirada' })
+  @HttpCode(200)
+  async retryCampaign(
+    @Param('id') campaignId: number,
+    @Request() req: { user: { id: number } },
+  ) {
+    if (!this.campaignsQueue) {
+      return {
+        success: false,
+        message: 'Fila de campanhas não disponível',
+      };
+    }
+
+    try {
+      const job = await this.campaignsQueue.add(
+        'process-campaign',
+        { campaignId: Number(campaignId), userId: req.user.id },
+        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+      );
+
+      return {
+        success: true,
+        message: `Campanha #${campaignId} enfileirada para processamento`,
+        jobId: job.id,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }
