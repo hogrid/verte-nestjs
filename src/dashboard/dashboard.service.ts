@@ -36,9 +36,27 @@ export class DashboardService {
       where: { user_id: userId, deleted_at: IsNull() },
     });
 
-    const totalContacts = await this.contactRepository.count({
-      where: { user_id: userId, deleted_at: IsNull() },
+    // Buscar número WhatsApp ativo do usuário para filtrar contatos
+    const numberActive = await this.numberRepository.findOne({
+      where: { user_id: userId, status: 1, deleted_at: IsNull() },
     });
+
+    // Contar contatos únicos filtrados por número ativo e cel_owner (usando DISTINCT igual à página de contatos)
+    let totalContacts = 0;
+    if (numberActive) {
+      // Normalizar o número (remover caracteres não numéricos)
+      const normalizedCel = numberActive.cel?.replace(/\D/g, '');
+
+      const result = await this.contactRepository
+        .createQueryBuilder('contacts')
+        .where('contacts.number_id = :numberId', { numberId: numberActive.id })
+        .andWhere('contacts.cel_owner = :celOwner', { celOwner: normalizedCel })
+        .andWhere('contacts.user_id = :userId', { userId })
+        .select('COUNT(DISTINCT contacts.number)', 'count')
+        .getRawOne();
+
+      totalContacts = parseInt(result?.count || '0', 10);
+    }
 
     const activeCampaigns = await this.campaignRepository.count({
       where: { user_id: userId, deleted_at: IsNull(), status: 0 },
@@ -62,6 +80,40 @@ export class DashboardService {
       0,
     );
 
+    // Get latest campaign without relations to avoid circular dependency issues
+    const campaign = await this.campaignRepository.findOne({
+      where: { user_id: userId, deleted_at: IsNull() },
+      order: { created_at: 'DESC' },
+    });
+
+    // If campaign exists, manually fetch related data
+    let campaignWithRelations = null;
+    if (campaign) {
+      // Get public data separately
+      const publicData = campaign.public_id
+        ? await this.campaignRepository
+            .createQueryBuilder('c')
+            .relation('public')
+            .of(campaign)
+            .loadOne()
+            .catch(() => null)
+        : null;
+
+      // Get messages separately
+      const messages = await this.campaignRepository
+        .createQueryBuilder('c')
+        .relation('messages')
+        .of(campaign)
+        .loadMany()
+        .catch(() => []);
+
+      campaignWithRelations = {
+        ...campaign,
+        public: publicData,
+        messages,
+      };
+    }
+
     return {
       total_contacts: totalContacts,
       total_campaigns: totalCampaigns,
@@ -69,6 +121,7 @@ export class DashboardService {
       total_messages_sent: totalMessagesSent,
       whatsapp_instances: whatsappInstances,
       connected_instances: connectedInstances,
+      campaign: campaignWithRelations,
     };
   }
 

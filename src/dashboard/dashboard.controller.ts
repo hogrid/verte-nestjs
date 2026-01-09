@@ -23,7 +23,8 @@ export class DashboardController {
   })
   @ApiResponse({ status: 200, description: 'Dashboard carregado' })
   async getDashboard(@Request() req: { user: { id: number } }) {
-    return this.dashboardService.getDashboard(req.user.id);
+    const data = await this.dashboardService.getDashboard(req.user.id);
+    return { data };
   }
 
   @Get('dashboard/recent-activity')
@@ -42,7 +43,8 @@ export class DashboardController {
     @Request() req: { user: { id: number } },
     @Query('limit') limit?: number,
   ) {
-    return this.dashboardService.getRecentActivity(req.user.id, limit);
+    const data = await this.dashboardService.getRecentActivity(req.user.id, limit);
+    return { data };
   }
 
   @Get('dashboard-data')
@@ -52,6 +54,7 @@ export class DashboardController {
   })
   @ApiResponse({ status: 200, description: 'Dados carregados' })
   async getDashboardData(@Request() req: { user: { id: number } }) {
-    return this.dashboardService.getDashboardData(req.user.id);
+    const data = await this.dashboardService.getDashboardData(req.user.id);
+    return { data };
   }
 }
