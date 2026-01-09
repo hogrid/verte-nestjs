@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Query,
   UseGuards,
@@ -213,6 +214,7 @@ export class ContactsController {
     },
   })
   async getIndicators(@Request() req: any) {
+    console.log('🎯 CONTROLLER getIndicators chamado! userId:', req.user?.id);
     return this.contactsService.getIndicators(req.user.id);
   }
 
@@ -970,5 +972,68 @@ export class ContactsController {
     }
 
     return this.contactsService.testImport(req.user.id, file);
+  }
+
+  /**
+   * DELETE /api/v1/contacts
+   * Delete all contacts from the user
+   * Called when WhatsApp is disconnected
+   */
+  @Delete()
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Remover todos os contatos',
+    description:
+      'Remove todos os contatos do usuário autenticado.\n\n' +
+      '**Requer autenticação**: Sim (JWT)\n\n' +
+      '**Funcionalidades:**\n' +
+      '- Remove TODOS os contatos do usuário\n' +
+      '- Filtrado por número WhatsApp ativo do usuário\n' +
+      '- Operação em lote (soft delete ou hard delete)\n' +
+      '- Chamado automaticamente ao desconectar WhatsApp\n\n' +
+      '**Segurança:**\n' +
+      '- Usuário só pode remover seus próprios contatos\n' +
+      '- Filtro por user_id aplicado automaticamente\n\n' +
+      '**Estrutura do response:**\n' +
+      '- `data.deleted`: Quantidade de contatos removidos\n' +
+      '- `data.message`: Mensagem de confirmação',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Contatos removidos com sucesso',
+    schema: {
+      example: {
+        data: {
+          deleted: 150,
+          message: 'Contatos removidos com sucesso',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autenticado',
+    schema: {
+      example: {
+        message: 'Unauthorized',
+        statusCode: 401,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Nenhum número WhatsApp ativo encontrado',
+    schema: {
+      example: {
+        message: 'Nenhum número WhatsApp ativo encontrado para este usuário.',
+        error: 'Not Found',
+        statusCode: 404,
+      },
+    },
+  })
+  async removeAll(@Request() req: any) {
+    return this.contactsService.removeAll(req.user.id);
   }
 }

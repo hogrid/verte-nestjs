@@ -281,6 +281,39 @@ export class WhatsappService {
           webhookUrl: webhookUrl,
         });
 
+        // NOVO: Se createInstance não retornou QR Code, buscar via connectInstance
+        if (!instanceInfo.qrCode) {
+          this.logger.log(
+            '🔄 QR Code não veio do createInstance, buscando via connectInstance...',
+          );
+
+          try {
+            const qrResponse = await this.whatsappProvider.connectInstance(
+              number.instance,
+            );
+
+            if (qrResponse.base64) {
+              await this.numberRepository.update(number.id, {
+                qrcode: qrResponse.base64,
+                status_connection: 0,
+              });
+
+              this.logger.log('✅ QR Code obtido via connectInstance');
+
+              return {
+                success: true,
+                qr_code: qrResponse.base64,
+                instance_name: number.instance,
+              };
+            }
+          } catch (connectError) {
+            this.logger.warn(
+              '⚠️ Erro ao buscar QR Code via connectInstance:',
+              connectError,
+            );
+          }
+        }
+
         // Salvar novo QR Code no banco
         if (instanceInfo.qrCode) {
           await this.numberRepository.update(number.id, {
@@ -346,28 +379,29 @@ export class WhatsappService {
       let phone = instanceInfo.phoneNumber;
       let profile = instanceInfo.profileName;
 
-      if (!connected) {
-        try {
-          const pgUri =
-            process.env.EVOLUTION_PG_URI ||
-            'postgres://postgres:postgres@localhost:5433/evolution';
-          const pg = new PgClient({ connectionString: pgUri });
-          await pg.connect();
-          const res = await pg.query(
-            'SELECT state, number, "profileName" FROM "Instance" WHERE name = $1 LIMIT 1',
-            [number.instance],
-          );
-          const row = res.rows?.[0];
-          await pg.end();
-          if (row) {
-            if (row.state === 'open') connected = true;
-            if (row.state === 'open') status = 'connected';
-            phone = row.number || phone;
-            profile = row.profileName || profile;
+      // SEMPRE buscar dados do Evolution Postgres (número e perfil)
+      try {
+        const pgUri =
+          process.env.EVOLUTION_PG_URI ||
+          'postgres://postgres:postgres@localhost:5433/evolution';
+        const pg = new PgClient({ connectionString: pgUri });
+        await pg.connect();
+        const res = await pg.query(
+          'SELECT "ownerJid", "profileName", "profilePicUrl" FROM "Instance" WHERE name = $1 LIMIT 1',
+          [number.instance],
+        );
+        const row = res.rows?.[0];
+        await pg.end();
+        if (row) {
+          // ownerJid é no formato "5511999999999@s.whatsapp.net"
+          if (row.ownerJid) {
+            phone = row.ownerJid.replace(/@.*/, '');
           }
-        } catch (error) {
-          // ignore error
+          profile = row.profileName || profile;
+          this.logger.log(`📱 Dados do Evolution: phone=${phone}, profile=${profile}`);
         }
+      } catch (error) {
+        this.logger.warn('⚠️ Erro ao buscar dados do Evolution Postgres:', error);
       }
 
       const connectionStatus = connected ? 1 : 0;
@@ -874,15 +908,19 @@ export class WhatsappService {
           const pg = new PgClient({ connectionString: pgUri });
           await pg.connect();
           const res = await pg.query(
-            'SELECT "profilePicUrl", "profileName", number FROM "Instance" WHERE name = $1 LIMIT 1',
+            'SELECT "profilePicUrl", "profileName", "ownerJid" FROM "Instance" WHERE name = $1 LIMIT 1',
             [instanceName],
           );
           const row = res.rows?.[0];
           if (row) {
+            // ownerJid é no formato "5511999999999@s.whatsapp.net"
+            const phoneNumber = row.ownerJid
+              ? row.ownerJid.replace(/@.*/, '')
+              : number.cel;
             await this.numberRepository.update(number.id, {
               photo: row.profilePicUrl || number.photo,
               name: row.profileName || number.name,
-              cel: row.number || number.cel,
+              cel: phoneNumber || number.cel,
             });
             this.logger.log('🖼️ Perfil atualizado a partir do Evolution', {
               profileName: row.profileName,
@@ -919,6 +957,54 @@ export class WhatsappService {
     return { success: true };
   }
 
+  /**
+   * Desconectar por nome da instância (logout)
+   * Usa disconnectInstance em vez de deleteInstance
+   * Mantém a instância para possível reconexão futura
+   */
+  async disconnectByName(instanceName: string, userId: number) {
+    this.logger.log('🔌 Desconectando instância por nome', { instanceName, userId });
+
+    // Validar propriedade da instância
+    const number = await this.numberRepository.findOne({
+      where: { user_id: userId, instance: instanceName, status: 1 },
+    });
+
+    if (!number) {
+      throw new NotFoundException('Instância não encontrada ou não pertence a este usuário');
+    }
+
+    // Desconectar (logout) - mantém instância para reconexão futura
+    try {
+      await this.whatsappProvider.disconnectInstance(instanceName);
+      this.logger.log(`✅ Instância desconectada via Evolution API: ${instanceName}`);
+    } catch (error) {
+      this.logger.warn(
+        `⚠️ Erro ao desconectar instância no Evolution API: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      // Continuar mesmo se erro no Evolution API
+      // Apenas atualizamos o banco de dados
+    }
+
+    // Atualizar status no banco
+    await this.numberRepository.update(number.id, {
+      status_connection: 0,
+    });
+
+    // Emitir evento de desconexão
+    this.statusSubject.next({
+      instanceName,
+      status: 'disconnected',
+    });
+
+    this.logger.log(`✅ Status de desconexão salvo no banco para instância: ${instanceName}`);
+
+    return {
+      success: true,
+      message: 'Desconectado com sucesso',
+    };
+  }
+
   private async deleteAndReset(instanceName: string, numberId: number) {
     try {
       await this.whatsappProvider.deleteInstance(instanceName);
@@ -952,11 +1038,12 @@ export class WhatsappService {
       const pg = new PgClient({ connectionString: pgUri });
       await pg.connect();
       const res = await pg.query(
-        'SELECT name, number, "profileName", "profilePicUrl" FROM "Instance" WHERE name = $1 LIMIT 1',
+        'SELECT name, "ownerJid", "profileName", "profilePicUrl" FROM "Instance" WHERE name = $1 LIMIT 1',
         [number.instance],
       );
       const row = res.rows?.[0] || {};
-      phone = row.number || phone;
+      // ownerJid é no formato "5511999999999@s.whatsapp.net"
+      phone = row.ownerJid ? row.ownerJid.replace(/@.*/, '') : phone;
       profileName = row.profileName || profileName;
       profilePicUrl = row.profilePicUrl || profilePicUrl;
       await pg.end();

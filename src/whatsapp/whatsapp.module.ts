@@ -3,7 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
 import { ContactsModule } from '../contacts/contacts.module';
 import { WhatsappController } from './whatsapp.controller';
-import { WahaCompatController } from './waha-compat.controller';
+import { LegacyCompatController } from './waha-compat.controller';
 import { WhatsappService } from './whatsapp.service';
 import { EvolutionApiProvider } from './providers/evolution-api.provider';
 import { WHATSAPP_PROVIDER } from './providers/whatsapp-provider.interface';
@@ -16,11 +16,11 @@ import { PublicByContact } from '../database/entities/public-by-contact.entity';
  * WhatsappModule
  *
  * Módulo de integração WhatsApp via Evolution API
- * Total: 11 endpoints implementados
+ * Total: 11 endpoints principais + endpoints de compatibilidade legada
  *
  * **ARQUITETURA DESACOPLADA**:
  * - Usa IWhatsAppProvider interface
- * - Fácil trocar de provider (Evolution API, WAHA, Cloud API, etc)
+ * - Provider atual: Evolution API v2
  * - Provider injetado via Dependency Injection
  *
  * **Para trocar de provider**:
@@ -29,9 +29,9 @@ import { PublicByContact } from '../database/entities/public-by-contact.entity';
  * { provide: WHATSAPP_PROVIDER, useClass: OutroProvider }
  * ```
  *
- * Endpoints:
+ * Endpoints principais:
  * - POST /api/v1/whatsapp/setup - Configurar WhatsApp (criar instância + QR Code)
- * - GET /api/v1/whatsapp/qrcode/:number - Obter QR Code atualizado (NOVO)
+ * - GET /api/v1/whatsapp/qrcode/:number - Obter QR Code atualizado
  * - GET /api/v1/whatsapp/status - Verificar status de conexão
  * - POST /api/v1/whatsapp/send-text - Enviar mensagem de texto
  * - POST /api/v1/whatsapp/send-template - Enviar template
@@ -41,6 +41,12 @@ import { PublicByContact } from '../database/entities/public-by-contact.entity';
  * - DELETE /api/v1/numbers/:number - Remover número
  * - GET /api/v1/whatsapp/webhook - Verificação de webhook
  * - POST /api/v1/whatsapp/webhook - Receber eventos WhatsApp
+ *
+ * Endpoints de compatibilidade legada (LegacyCompatController):
+ * - POST /api/v1/disconnect-waha-session - Desconectar sessão (protegido)
+ * - POST /api/v1/waha/disconnect - Desconectar (protegido)
+ * - POST /api/v1/waha/qr - Gerar QR Code (legado)
+ * - GET /api/v1/waha/sessions/:sessionName - Status da sessão (legado)
  */
 @Module({
   imports: [
@@ -48,7 +54,7 @@ import { PublicByContact } from '../database/entities/public-by-contact.entity';
     ContactsModule,
     TypeOrmModule.forFeature([Number, MessageByContact, PublicByContact]),
   ],
-  controllers: [WhatsappController, WahaCompatController],
+  controllers: [WhatsappController, LegacyCompatController],
   providers: [
     WhatsappService,
     InstanceManagerService, // Gerenciador automático de instâncias

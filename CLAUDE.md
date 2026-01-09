@@ -1,285 +1,169 @@
-# Verte Backend - NestJS
+# CLAUDE.md
 
-[![Migration Status](https://img.shields.io/badge/migration-100%25%20COMPLETA-success)](https://github.com/seu-org/verte-nestjs)
-[![Compatibility](https://img.shields.io/badge/compatibility-100%25%20Laravel-success)](./docs/migration-specs/migration-master-spec.md)
-[![Tests](https://img.shields.io/badge/tests-415%2B%20scenarios-brightgreen)](./test)
-[![Laravel Original](https://img.shields.io/badge/source-Laravel%208-red)](../verte-back)
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Backend NestJS do sistema **Verte** - Plataforma de automação de marketing via WhatsApp.
+## Project Overview
 
-> **✅ MIGRAÇÃO COMPLETA**: 121/121 endpoints implementados com 100% de compatibilidade Laravel.
+**Verte Backend** - NestJS migration from Laravel 8. This is a WhatsApp marketing automation platform with **100% complete migration** (121/121 endpoints). The system shares the same MySQL database with the legacy Laravel application.
 
----
-
-## 📊 Status da Migração
-
-### ✅ Implementação: 100% Completa
-
-- **121/121 endpoints** implementados
-- **415+ cenários de teste E2E** (100% passando)
-- **22+ tabelas** MySQL compartilhadas com Laravel
-- **Integrações**: **Evolution API v2** (WhatsApp), Stripe, MercadoPago
-- **100% compatibilidade** Laravel (responses idênticos, validações em português)
-
-### ⚡ Mudança Importante: Evolution API + Arquitetura Desacoplada
-
-**Migrado WAHA → Cloud API → Evolution API com arquitetura provider-based**
-
-**Vantagens Evolution API:**
-- ✅ Múltiplas sessões (cada usuário conecta seu próprio número via QR Code)
-- ✅ Conexão via QR Code (não precisa aprovação Meta)
-- ✅ Open-source e auto-hospedável
-- ✅ Gratuito e sem limitações
-- ✅ API completa (mensagens, mídia, webhooks)
-
-**Arquitetura Desacoplada:**
-- ✅ Interface `IWhatsAppProvider` abstrata
-- ✅ Fácil trocar entre providers (Evolution API, WAHA, Cloud API, etc)
-- ✅ Dependency Injection via NestJS
-- ✅ Zero mudanças no service/controller ao trocar provider
-
-### 📦 Módulos Implementados
-
-| Categoria | Módulos | Endpoints | Testes E2E |
-|-----------|---------|-----------|------------|
-| **Core** | Auth, Users, Plans | 20 | ✅ 66 cenários |
-| **Contatos** | Contacts, Labels, Publics | 18 | ✅ 99 cenários |
-| **Campanhas** | Campaigns, Templates, Queue | 20 | ✅ 47 cenários |
-| **WhatsApp** | WhatsApp (Evolution API), Numbers, Schedule | 25 | ✅ 63 cenários |
-| **Pagamentos** | Payments (Stripe) | 4 | ✅ 16 cenários |
-| **Arquivos** | Files, Export | 5 | ✅ 34 cenários |
-| **Admin** | Admin, Dashboard, Utilities | 29 | ✅ 63 cenários |
-| **Extras** | User Profile, Extractor, Remaining | 20 | ✅ 27 cenários |
-| **TOTAL** | **21 módulos** | **121** | **✅ 415+** |
+**Status**: Production-ready with 415+ E2E tests passing.
 
 ---
 
-## 🚀 Quick Start
+## Common Development Commands
 
-### Instalação
+### Running the Application
 
 ```bash
-# Clone e instale
-git clone https://github.com/seu-org/verte-nestjs.git
-cd verte-nestjs
-npm install
-
-# Configure ambiente (MESMO banco do Laravel)
-cp .env.example .env
-# Edite .env com suas credenciais
-
-# Inicie Evolution API (WhatsApp) via Docker
-docker-compose up -d
-
-# Inicie o backend NestJS
+# Development with hot-reload
 npm run start:dev
+
+# Production build
+npm run build
+npm run start:prod
+
+# Start Docker services (Evolution API, MySQL, Redis, PostgreSQL)
+docker-compose up -d
 ```
 
-### Configuração Essencial
-
-```env
-# Database (CRÍTICO: MESMO do Laravel!)
-# Frontend já roda MySQL via docker-compose - conectar nele
-DB_HOST=localhost
-DB_PORT=5306
-DB_DATABASE=VerteApp
-DB_USERNAME=root
-DB_PASSWORD=yPiS83D8iN
-
-# JWT (compatível com Sanctum)
-JWT_SECRET=your-secret-key
-JWT_EXPIRATION=3600
-
-# Stripe
-STRIPE_SECRET_KEY=sk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-
-# Evolution API (WhatsApp - via Docker)
-# docker-compose.yml inicia Evolution API automaticamente
-EVOLUTION_API_URL=http://localhost:8080
-EVOLUTION_API_KEY=change-me-to-secure-api-key
-```
-
-**⚠️ Database setup**:
-- MySQL roda via docker-compose do **frontend** (verte-front)
-- Backend NestJS conecta em `localhost:5306` (MySQL do frontend)
-- Tabelas já existem (compartilhadas com Laravel legacy)
-
----
-
-## 🧪 Testes
-
-### Executar Testes
+### Testing (Required Before Commits)
 
 ```bash
-# Testes E2E (415+ cenários)
+# E2E tests (415+ scenarios)
 npm run test:e2e
 
-# Testes específicos
+# Run specific test file
 npm run test:e2e -- test/auth/auth.e2e-spec.ts
 
-# Build + Type Check
-npm run build
+# TypeScript validation
 npm run typecheck
 
-# Validação completa (OBRIGATÓRIO antes de commit)
-npm run validate:full
+# Linting
+npm run lint
+
+# COMPLETE VALIDATION (required before commit)
+npm run validate:full    # typecheck + lint + build + tests
 ```
 
-### Cobertura de Testes
-
-**21 arquivos de teste E2E** cobrindo:
-- ✅ Autenticação e autorização (JWT + AdminGuard)
-- ✅ CRUD completo de todos os recursos
-- ✅ Validações em português
-- ✅ Soft deletes, Integrações (Stripe, Evolution API)
-- ✅ Upload/Download de arquivos
-- ✅ Paginação estilo Laravel
-- ✅ Webhooks e callbacks
-
----
-
-## 📚 Arquitetura
-
-### Stack
-
-```
-NestJS 10 + TypeScript 5
-├── TypeORM (MySQL - shared with Laravel)
-├── Passport JWT (auth)
-├── Bull Queue + Redis (jobs)
-├── Stripe SDK (payments)
-├── Multer (file uploads)
-└── Jest (testing)
-```
-
-### Estrutura
-
-```
-src/
-├── auth/              # Autenticação JWT (6 endpoints)
-├── users/             # Usuários + configuração (8 endpoints)
-├── plans/             # Planos de assinatura (6 endpoints)
-├── contacts/          # Contatos (9 endpoints)
-├── labels/            # Labels (3 endpoints)
-├── publics/           # Públicos-alvo (6 endpoints)
-├── campaigns/         # Campanhas (16 endpoints)
-├── templates/         # Templates de mensagens (4 endpoints)
-├── whatsapp/          # Integração Evolution API (15 endpoints)
-├── numbers/           # Instâncias WhatsApp (6 endpoints)
-├── schedule/          # Agendamento (jobs)
-├── queue/             # Filas assíncronas (Bull)
-├── payments/          # Stripe (4 endpoints)
-├── files/             # Upload/Download (3 endpoints)
-├── export/            # Exportação CSV (2 endpoints)
-├── admin/             # Administração (11 endpoints)
-├── dashboard/         # Dashboard (2 endpoints)
-├── utilities/         # Utilitários (19 endpoints)
-├── user-profile/      # Perfil do usuário (2 endpoints)
-├── extractor/         # Extrator (3 endpoints)
-├── remaining/         # Endpoints finais (18 endpoints)
-└── database/
-    └── entities/      # 22+ entidades TypeORM
-```
-
----
-
-## ✅ Regras Críticas (Compatibilidade Laravel)
-
-### SEMPRE Faça
-
-- ✅ Manter URIs de rotas **idênticas**
-- ✅ Preservar estrutura de responses JSON
-- ✅ Manter validações em **português**
-- ✅ Usar **mesmo banco de dados**
-- ✅ Implementar soft deletes
-- ✅ Manter status codes corretos
-- ✅ Consultar código Laravel original em `../verte-back/`
-
-### NUNCA Faça
-
-- ❌ Alterar URIs de rotas
-- ❌ Criar novas tabelas no banco
-- ❌ Mudar estrutura de responses
-- ❌ Alterar mensagens de validação
-- ❌ Ignorar soft deletes
-- ❌ Usar diferentes status codes
-
----
-
-## 📖 Documentação Swagger
-
-**URL**: http://localhost:3000/api/docs
-
-Documentação completa e interativa de todos os 121 endpoints.
-
----
-
-## 🎯 Status Atual e Próximos Passos
-
-### ✅ Fase Atual: Testes de Compatibilidade Frontend (13/11/2025)
-
-**Status**: Backend 100% funcional, iniciando testes manuais com frontend React
-
-**Status Atual**:
-- ✅ Backend NestJS 100% funcional (121 endpoints)
-- ✅ Evolution API integrada (QR Code + polling)
-- ✅ Frontend React conectado ao backend
-- ✅ Testes E2E: 415+ cenários passando
-
----
-
-## 🔧 Scripts Úteis
+### Database Seeding
 
 ```bash
-# Desenvolvimento
-npm run start:dev          # Dev com hot-reload
-npm run build              # Build produção
-npm run start:prod         # Executar produção
+# Incremental seed (skips existing data)
+npm run seed
 
-# Testes
-npm run test               # Unit tests
-npm run test:e2e           # E2E tests (415+ cenários)
-npm run test:cov           # Coverage report
+# Fresh seed (clears and recreates all data)
+npm run seed:fresh
 
-# Validação (OBRIGATÓRIO antes de commit)
-npm run typecheck          # TypeScript check
-npm run lint               # ESLint
-npm run validate:full      # typecheck + lint + build + tests
+# Check existing users
+npm run check:users
 
-# Database
-npm run migration:status   # Ver status
-# NÃO usar migration:run (usa banco Laravel)
+# Create admin user
+npm run create:admin
 ```
+
+### Test Credentials
+
+| Email | Password | Profile | Plan |
+|-------|----------|---------|------|
+| `admin@verte.com` | `123456` | Administrator | Professional |
+| `pro@verte.com` | `123456` | User | Professional |
+| `basico@verte.com` | `123456` | User | Basic |
+| `free@verte.com` | `123456` | User | Free |
 
 ---
 
-## 📝 Informações Importantes
+## High-Level Architecture
 
-### TypeScript Strict Mode
+### Provider Pattern (WhatsApp Integration)
 
-Configurado com validações pragmáticas:
-- ✅ `strict: true`
-- ✅ `noImplicitAny: true`
-- ⚡ `strictPropertyInitialization: false` (TypeORM)
+The system uses a **decoupled provider architecture** for WhatsApp integration. This is critical for understanding how WhatsApp features work:
 
-**Workflow obrigatório**:
-```bash
-npm run validate:full  # ANTES de QUALQUER commit
+**Interface**: `IWhatsAppProvider` (src/whatsapp/providers/whatsapp-provider.interface.ts)
+- Abstract interface defining all WhatsApp operations
+- Allows swapping providers without changing business logic
+
+**Current Implementation**: `EvolutionApiProvider`
+- Multi-session support (each user connects their own number via QR Code)
+- No Meta approval required
+- Self-hosted and free
+
+**Usage Pattern**:
+```typescript
+// In services - inject the abstract interface
+constructor(
+  @Inject(WHATSAPP_PROVIDER)
+  private readonly whatsappProvider: IWhatsAppProvider,
+) {}
+
+// Call provider methods - implementation is transparent
+await this.whatsappProvider.sendText(instanceName, { to, text });
 ```
 
-### Soft Deletes
+**To switch providers**: Only update the provider registration in `whatsapp.module.ts` - no service/controller changes needed.
 
-Todas as entities principais implementam soft delete:
-- Campo `deleted_at` (nullable)
-- Usar `IsNull()` em queries
-- `.withDeleted()` para incluir deletados
+### Authentication & Authorization
 
-### Paginação Laravel
+**JWT Authentication** (Passport JWT):
+- Strategy: `src/auth/strategies/jwt.strategy.ts`
+- Guard: `JwtAuthGuard` - applied globally in `app.module.ts`
+- Public endpoints: Use `@Public()` decorator from `src/auth/decorators/public.decorator`
+
+**Admin Authorization**:
+- Guard: `AdminGuard` - checks `user.profile === 'administrator'`
+- Apply to controller methods: `@UseGuards(AdminGuard)`
+
+**User Extraction**:
+- Decorator: Create `@CurrentUser()` decorator to extract `request.user`
+- User entity attached to request by JWT strategy
+
+### Validation Architecture (Laravel Compatible)
+
+**Critical**: All validation messages must be in **Portuguese** to maintain Laravel compatibility.
+
+**Pipeline**:
+1. DTO validation with `class-validator` decorators
+2. Custom exception factory (main.ts) converts to Laravel-style format
+3. `BadRequestToValidationFilter` converts 400 → 422 status code
+4. `ValidationExceptionFilter` formats response as:
+   ```json
+   {
+     "success": false,
+     "message": "Erro de validação",
+     "errors": ["Campo obrigatório", ...]
+   }
+   ```
+
+**Status Codes**:
+- Validation errors: **422** (not 400)
+- Not found: **404**
+- Unauthorized: **401**
+- Forbidden: **403**
+
+### Soft Delete Pattern
+
+All main entities implement soft delete via TypeORM:
+- Field: `deleted_at` (nullable timestamp)
+- Query filtering: Use `IsNull` for `deleted_at`
+- Repository methods: `.softDelete()`, `.withDeleted()`
+
+```typescript
+// Correct: exclude deleted records
+.where({ deleted_at: IsNull() })
+
+// Include deleted records
+.withDeleted()
+
+// Soft delete
+await repository.softDelete(id)
+```
+
+### Laravel Pagination Style
+
+All list endpoints must return Laravel-style pagination:
 
 ```typescript
 {
-  data: [...],
+  data: [...],           // Array of items
   meta: {
     current_page: 1,
     from: 1,
@@ -291,19 +175,204 @@ Todas as entities principais implementam soft delete:
 }
 ```
 
+Helper: `paginateResults()` utility creates this format.
+
+### Scheduled Jobs (Cron)
+
+**Service**: `ScheduleService` (src/schedule/schedule.service.ts)
+
+**Active Jobs**:
+- `dispatchScheduledCampaigns`: Every minute - enqueues scheduled campaigns
+- `syncContactsPeriodic`: Every 30 minutes - syncs contacts from Evolution API
+
+**Pattern**: Uses `@Cron()` decorator with concurrency flags (`isProcessing`, `isSyncingContacts`) to prevent parallel execution.
+
+### Queue System (Bull + Redis)
+
+**Configuration**: `src/config/redis.config.ts`
+
+**Queue Names**:
+- `campaigns` - Campaign processing jobs
+- `simplified-public` - Simplified public creation
+- `custom-public` - Custom public creation
+- `whatsapp-message` - WhatsApp message sending
+
+**Features**:
+- Exponential backoff retry
+- Dead Letter Queues (DLQ) for failed jobs
+- Job options configured in `bullDefaultJobOptions`
+
+**Testing**: Mock queues with `createMockQueueProviders()` helper.
+
 ---
 
-## 📊 Estatísticas
+## Critical Constraints (Laravel Compatibility)
 
-| Métrica | Valor |
-|---------|-------|
-| Endpoints Implementados | 121/121 (100%) |
-| Módulos NestJS | 21 |
-| Testes E2E | 415+ cenários |
-| Compatibilidade Laravel | 100% |
+### ALWAYS DO:
+- ✅ Keep route URIs **identical** to Laravel
+- ✅ Preserve JSON response structure exactly
+- ✅ Maintain validation messages in **Portuguese**
+- ✅ Use the **same MySQL database** (no new tables)
+- ✅ Implement soft deletes on all main entities
+- ✅ Use correct HTTP status codes
+- ✅ Consult Laravel code in `../verte-back/` when uncertain
+
+### NEVER DO:
+- ❌ Change route URIs
+- ❌ Create new database tables
+- ❌ Modify response structure
+- ❌ Change validation messages to English
+- ❌ Ignore soft deletes
+- ❌ Use different status codes than Laravel
 
 ---
 
-**Status**: ✅ Migração 100% Completa
-**Stack**: NestJS + TypeORM + MySQL + Redis + Bull + Evolution API
-**Última atualização**: Novembro 2024
+## Important Configuration
+
+### Environment Variables
+
+```bash
+# Database (CRITICAL: Same as Laravel)
+DB_HOST=localhost
+DB_PORT=5306
+DB_DATABASE=VerteApp
+DB_USERNAME=root
+DB_PASSWORD=yPiS83D8iN
+
+# JWT (Sanctum compatible)
+JWT_SECRET=your-secret-key
+JWT_EXPIRATION=3600
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+
+# Evolution API (WhatsApp)
+EVOLUTION_API_URL=http://localhost:8080
+EVOLUTION_API_KEY=change-me-to-secure-api-key
+EVOLUTION_API_WEBHOOK_URL=http://localhost:3000/api/v1/whatsapp/webhook
+
+# Evolution PostgreSQL (for instance data)
+EVOLUTION_PG_URI=postgres://postgres:postgres@localhost:5433/evolution
+```
+
+### TypeScript Configuration
+
+**Strict Mode**: Currently **disabled** (`strict: false` in tsconfig.json)
+- Pragmatic approach for TypeORM entity initialization
+- Still use proper typing where possible
+- Run `npm run typecheck` before commits
+
+### Docker Services
+
+**Evolution API Stack** (docker-compose.yml):
+- `evolution-api`:8080 - WhatsApp API
+- `postgres`:5433 - Evolution's database
+- `redis`:6380 - Cache for Evolution
+- `db_mysql`:5306 - Main application database (shared with Laravel)
+
+**Network**: All services on `VerteApp` network for inter-service communication.
+
+---
+
+## Module Structure (21 Modules)
+
+**Core**: Auth, Users, Plans
+**Contacts**: Contacts, Labels, Publics
+**Campaigns**: Campaigns, Templates, Queue
+**WhatsApp**: Whatsapp (Evolution API), Numbers, Schedule
+**Payments**: Payments (Stripe)
+**Files**: Files, Export
+**Admin**: Admin, Dashboard, Utilities
+**Extras**: UserProfile, Extractor, Remaining
+
+---
+
+## Common Patterns
+
+### Controller Pattern
+
+```typescript
+@Controller('api/v1/resource')
+@UseGuards(JwtAuthGuard)  // Apply JWT auth
+export class ResourceController {
+  constructor(private readonly service: ResourceService) {}
+
+  @Post()
+  async create(@RequestUser() user: User, @Body() dto: CreateDto) {
+    return this.service.create(user.id, dto);
+  }
+
+  @Get(':id')
+  async findOne(@RequestUser() user: User, @Param('id') id: number) {
+    return this.service.findOne(user.id, id);
+  }
+}
+```
+
+### Service Pattern
+
+```typescript
+@Injectable()
+export class ResourceService {
+  constructor(
+    @InjectRepository(Entity)
+    private readonly repository: Repository<Entity>,
+  ) {}
+
+  async create(userId: number, dto: CreateDto) {
+    const entity = this.repository.create({ ...dto, user_id: userId });
+    return this.repository.save(entity);
+  }
+
+  async findOne(userId: number, id: number) {
+    const entity = await this.repository.findOne({
+      where: { id, user_id: userId, deleted_at: IsNull() },
+    });
+    if (!entity) throw new NotFoundException('Recurso não encontrado');
+    return entity;
+  }
+}
+```
+
+### Creating a New Endpoint
+
+1. Add DTO in `module/dto/` with Portuguese validation messages
+2. Add service method in `module.service.ts`
+3. Add controller method in `module.controller.ts`
+4. Add E2E test case in `test/module/module.e2e-spec.ts`
+5. Run `npm run validate:full`
+
+---
+
+## Troubleshooting
+
+### WhatsApp Connection Issues
+
+**Problem**: QR Code not generating or connection failing
+
+**Solution**: Check `InstanceManagerService` logs - automatic health checks and recovery are built-in. Corrupted instances are auto-cleaned.
+
+### Test Failures
+
+**Problem**: E2E tests failing
+
+**Solutions**:
+1. Check MySQL is running: `docker-compose up db_mysql`
+2. Check Redis is running: `docker-compose up redis`
+3. Run tests with mocks: `MOCK_STRIPE=1 MOCK_BULL=1 npm run test:e2e`
+4. Clear test data: `npm run seed:fresh`
+
+### TypeORM Issues
+
+**Problem**: Entity relation errors
+
+**Solution**: Ensure `strictPropertyInitialization: false` in tsconfig.json for TypeORM entities with relations.
+
+---
+
+## Documentation
+
+- **Swagger Docs**: http://localhost:3000/api/docs
+- **Migration Specs**: See `docs/migration-specs/`
+- **Laravel Reference**: `../verte-back/` (legacy codebase)

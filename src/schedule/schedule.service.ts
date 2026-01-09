@@ -6,6 +6,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThanOrEqual } from 'typeorm';
 import { QUEUE_NAMES } from '../config/redis.config';
 import { Campaign } from '../database/entities/campaign.entity';
+import { Number } from '../database/entities/number.entity';
+import { ContactsService } from '../contacts/contacts.service';
 
 /**
  * ScheduleService
@@ -14,6 +16,7 @@ import { Campaign } from '../database/entities/campaign.entity';
  *
  * Jobs implementados:
  * - dispatchScheduledCampaigns: Verifica e dispara campanhas agendadas (a cada minuto)
+ * - syncContactsPeriodic: Sincroniza contatos de instâncias conectadas (a cada 30 minutos)
  *
  * Compatibilidade: Laravel Schedule (app/Console/Kernel.php)
  */
@@ -21,12 +24,16 @@ import { Campaign } from '../database/entities/campaign.entity';
 export class ScheduleService {
   private readonly logger = new Logger(ScheduleService.name);
   private isProcessing = false; // Prevenir execuções paralelas
+  private isSyncingContacts = false; // Prevenir sync paralelos
 
   constructor(
     @InjectRepository(Campaign)
     private readonly campaignRepository: Repository<Campaign>,
+    @InjectRepository(Number)
+    private readonly numberRepository: Repository<Number>,
     @InjectQueue(QUEUE_NAMES.CAMPAIGNS)
     private readonly campaignsQueue: Queue,
+    private readonly contactsService: ContactsService,
   ) {}
 
   /**
@@ -155,5 +162,94 @@ export class ScheduleService {
   async manualDispatch() {
     this.logger.log('🔧 Disparo manual de campanhas agendadas');
     await this.dispatchScheduledCampaigns();
+  }
+
+  /**
+   * Sync Contacts Periodic
+   *
+   * Executa a cada 30 minutos para sincronizar contatos
+   * de todas as instâncias WhatsApp conectadas.
+   */
+  @Cron(CronExpression.EVERY_30_MINUTES, {
+    name: 'sync-contacts-periodic',
+    timeZone: 'America/Sao_Paulo',
+  })
+  async syncContactsPeriodic() {
+    if (this.isSyncingContacts) {
+      this.logger.warn('⚠️ Sync anterior ainda em andamento, pulando');
+      return;
+    }
+
+    this.isSyncingContacts = true;
+
+    try {
+      this.logger.log('📱 [CRON] Iniciando sincronização periódica de contatos');
+
+      // Buscar todas as instâncias WhatsApp conectadas
+      const connectedNumbers = await this.numberRepository.find({
+        where: {
+          status: 1, // Ativo
+          status_connection: 1, // Conectado
+        },
+      });
+
+      if (connectedNumbers.length === 0) {
+        this.logger.debug('✅ Nenhuma instância WhatsApp conectada para sincronizar');
+        return;
+      }
+
+      this.logger.log(
+        `📋 Encontradas ${connectedNumbers.length} instância(s) conectada(s)`,
+      );
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (const number of connectedNumbers) {
+        try {
+          // Verificar se tem cel (número do telefone) - necessário para sync
+          if (!number.cel) {
+            this.logger.warn(
+              `⚠️ Instância ${number.instance} sem número de telefone, pulando`,
+            );
+            continue;
+          }
+
+          const result = await this.contactsService.syncFromEvolution(
+            number.user_id,
+          );
+
+          this.logger.log(
+            `✅ User ${number.user_id}: ${result.imported}/${result.total} contatos sincronizados`,
+          );
+          successCount++;
+        } catch (error) {
+          this.logger.error(
+            `❌ Erro ao sincronizar contatos do user ${number.user_id}:`,
+            error instanceof Error ? error.message : String(error),
+          );
+          errorCount++;
+        }
+      }
+
+      this.logger.log(
+        `🎉 [CRON] Sync de contatos concluído: ${successCount} sucesso, ${errorCount} erros`,
+      );
+    } catch (error) {
+      this.logger.error(
+        '❌ [CRON] Erro crítico ao sincronizar contatos',
+        error instanceof Error ? error.message : String(error),
+      );
+    } finally {
+      this.isSyncingContacts = false;
+    }
+  }
+
+  /**
+   * Manual trigger for contacts sync
+   */
+  async manualContactsSync() {
+    this.logger.log('🔧 Disparo manual de sincronização de contatos');
+    await this.syncContactsPeriodic();
   }
 }

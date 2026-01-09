@@ -2,13 +2,14 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets, In, IsNull } from 'typeorm';
 import { Subject, Observable } from 'rxjs';
 import { Client as PgClient } from 'pg';
 import { Contact } from '../database/entities/contact.entity';
-import { Number } from '../database/entities/number.entity';
+import { Number as NumberEntity } from '../database/entities/number.entity';
 import { ListContactsDto } from './dto/list-contacts.dto';
 import { UpdateContactsStatusDto } from './dto/update-contacts-status.dto';
 import { BlockContactsDto } from './dto/block-contacts.dto';
@@ -38,6 +39,8 @@ import csvParser from 'csv-parser';
  */
 @Injectable()
 export class ContactsService {
+  private readonly logger = new Logger(ContactsService.name);
+
   private readonly syncSubject = new Subject<{
     type: 'start' | 'progress' | 'complete' | 'error';
     total?: number;
@@ -48,8 +51,8 @@ export class ContactsService {
   constructor(
     @InjectRepository(Contact)
     private readonly contactRepository: Repository<Contact>,
-    @InjectRepository(Number)
-    private readonly numberRepository: Repository<Number>,
+    @InjectRepository(NumberEntity)
+    private readonly numberRepository: Repository<NumberEntity>,
   ) {}
 
   onSync(): Observable<{
@@ -63,18 +66,59 @@ export class ContactsService {
   }
 
   async syncFromEvolution(userId: number) {
+    this.logger.log(`🔄 Iniciando syncFromEvolution para user ${userId}`);
+
     const numberActive = await this.numberRepository.findOne({
       where: { user_id: userId, status: 1 },
     });
-    if (!numberActive || !numberActive.cel) {
+    if (!numberActive) {
+      this.logger.error(`❌ Nenhum número ativo encontrado para user ${userId}`);
       throw new NotFoundException(
         'Nenhum número WhatsApp ativo encontrado para este usuário.',
       );
     }
 
+    this.logger.log(`✅ Número ativo encontrado: ${numberActive.instance} (cel: ${numberActive.cel})`);
+
+    // Se cel não estiver disponível, tentar buscar do Evolution Postgres
+    let ownerCel = numberActive.cel;
+    if (!ownerCel && numberActive.instance) {
+      try {
+        const pgUri =
+          process.env.EVOLUTION_PG_URI ||
+          'postgres://postgres:postgres@localhost:5433/evolution';
+        const pg = new PgClient({ connectionString: pgUri });
+        await pg.connect();
+        const res = await pg.query(
+          'SELECT "ownerJid" FROM "Instance" WHERE name = $1 LIMIT 1',
+          [numberActive.instance],
+        );
+        const row = res.rows?.[0];
+        await pg.end();
+        if (row?.ownerJid) {
+          // ownerJid é no formato "5511999999999@s.whatsapp.net"
+          ownerCel = row.ownerJid.replace(/@.*/, '');
+          // Salvar o cel no banco para uso futuro
+          await this.numberRepository.update(numberActive.id, { cel: ownerCel });
+        }
+      } catch (error) {
+        // Usar instance name como fallback
+        ownerCel = numberActive.instance;
+      }
+    }
+
+    // Se ainda não tiver cel, usar instance como identificador
+    if (!ownerCel) {
+      ownerCel = numberActive.instance || `user_${userId}`;
+    }
+
+    this.logger.log(`📱 ownerCel final: ${ownerCel}`);
+
     const pgUri =
       process.env.EVOLUTION_PG_URI ||
       'postgres://postgres:postgres@localhost:5433/evolution';
+    this.logger.log(`🔗 Conectando ao Evolution Postgres: ${pgUri.replace(/:[^@]+@/, ':****@')}`);
+
     const pg = new PgClient({ connectionString: pgUri });
     await pg.connect();
     try {
@@ -84,32 +128,63 @@ export class ContactsService {
       );
       const instanceId = instRes.rows?.[0]?.id;
       if (!instanceId) {
+        this.logger.error(`❌ Instância "${numberActive.instance}" não encontrada no Evolution`);
         throw new Error('Instância não encontrada no Evolution');
       }
+
+      this.logger.log(`✅ Instância encontrada no Evolution: ${instanceId}`);
 
       const countRes = await pg.query(
         'SELECT COUNT(*)::int AS cnt FROM "Contact" WHERE "instanceId" = $1',
         [instanceId],
       );
       const total: number = countRes.rows?.[0]?.cnt ?? 0;
+      this.logger.log(`📊 Total de contatos no Evolution: ${total}`);
+
       this.syncSubject.next({ type: 'start', total, imported: 0, progress: 0 });
 
       const batchSize = 500;
       let imported = 0;
-      const normalizedOwner = NumberHelper.formatNumber(numberActive.cel);
+      let skipped = 0;
+      let filtered = 0;
+      const normalizedOwner = NumberHelper.formatNumber(ownerCel) || ownerCel;
+
+      this.logger.log(`🔄 Iniciando loop de importação (batchSize: ${batchSize})`);
+
       for (let offset = 0; offset < total; offset += batchSize) {
         const rowsRes = await pg.query(
           'SELECT "remoteJid", "pushName" FROM "Contact" WHERE "instanceId" = $1 ORDER BY "createdAt" ASC OFFSET $2 LIMIT $3',
           [instanceId, offset, batchSize],
         );
+        const batchCount = rowsRes.rows.length;
+        this.logger.log(`📦 Batch ${offset}-${offset + batchCount}: ${batchCount} contatos`);
+
         for (const r of rowsRes.rows as Array<{
           remoteJid: string;
           pushName: string | null;
         }>) {
           const remote = r.remoteJid || '';
+
+          // Filtrar grupos - só importar contatos
+          if (NumberHelper.isGroupJid(remote)) {
+            filtered++;
+            continue; // Pular grupos (@g.us)
+          }
+
+          // Verificar se é um contato válido
+          if (!NumberHelper.isValidContactJid(remote)) {
+            filtered++;
+            continue; // Pular se não é um contato válido (@s.whatsapp.net)
+          }
+
           const digits = remote.replace(/@.*/, '').replace(/\D/g, '');
           const phone = NumberHelper.formatNumber(digits);
-          if (!phone) continue;
+
+          // Validar número brasileiro
+          if (!NumberHelper.isValidBrazilianPhone(phone)) {
+            filtered++;
+            continue; // Pular números inválidos
+          }
 
           const exists = await this.contactRepository.findOne({
             where: {
@@ -118,7 +193,10 @@ export class ContactsService {
               number: phone,
             },
           });
-          if (exists) continue;
+          if (exists) {
+            skipped++;
+            continue;
+          }
 
           const contact = this.contactRepository.create({
             user_id: userId,
@@ -131,6 +209,11 @@ export class ContactsService {
           });
           await this.contactRepository.save(contact);
           imported++;
+
+          // Log a cada 10 contatos importados
+          if (imported % 10 === 0) {
+            this.logger.log(`✅ Importados: ${imported} (filtrados: ${filtered}, pulados: ${skipped})`);
+          }
         }
         const progress =
           total > 0
@@ -138,6 +221,8 @@ export class ContactsService {
             : 100;
         this.syncSubject.next({ type: 'progress', total, imported, progress });
       }
+
+      this.logger.log(`🎉 Sincronização finalizada: ${imported} importados, ${skipped} pulados (já existiam), ${filtered} filtrados (inválidos/grupos)`);
 
       this.syncSubject.next({
         type: 'complete',
@@ -147,6 +232,7 @@ export class ContactsService {
       });
       return { total, imported };
     } catch (err: any) {
+      this.logger.error(`❌ Erro na sincronização: ${err?.message || err}`, err.stack);
       this.syncSubject.next({ type: 'error', message: err?.message });
       throw err;
     } finally {
@@ -177,14 +263,46 @@ export class ContactsService {
       },
     });
 
-    if (!numberActive || !numberActive.cel) {
+    if (!numberActive) {
       throw new NotFoundException(
         'Nenhum número WhatsApp ativo encontrado para este usuário.',
       );
     }
 
-    // 2. Normalize cel_owner
-    const normalizedCel = NumberHelper.formatNumber(numberActive.cel);
+    // 2. Get cel - try to fetch from Evolution if not available
+    let ownerCel = numberActive.cel;
+    if (!ownerCel && numberActive.instance) {
+      try {
+        const pgUri =
+          process.env.EVOLUTION_PG_URI ||
+          'postgres://postgres:postgres@localhost:5433/evolution';
+        const pg = new PgClient({ connectionString: pgUri });
+        await pg.connect();
+        const res = await pg.query(
+          'SELECT "ownerJid" FROM "Instance" WHERE name = $1 LIMIT 1',
+          [numberActive.instance],
+        );
+        const row = res.rows?.[0];
+        await pg.end();
+        if (row?.ownerJid) {
+          // ownerJid format: "5511999999999@s.whatsapp.net"
+          ownerCel = row.ownerJid.replace(/@.*/, '');
+          // Save cel for future use
+          await this.numberRepository.update(numberActive.id, { cel: ownerCel });
+        }
+      } catch {
+        // Use instance name as fallback
+        ownerCel = numberActive.instance;
+      }
+    }
+
+    // If still no cel, use instance as identifier
+    if (!ownerCel) {
+      ownerCel = numberActive.instance || `user_${userId}`;
+    }
+
+    // 3. Normalize cel_owner
+    const normalizedCel = NumberHelper.formatNumber(ownerCel) || ownerCel;
 
     // 3. Build query with base filters
     const query = this.contactRepository
@@ -194,16 +312,32 @@ export class ContactsService {
       .andWhere('contacts.user_id = :userId', { userId })
       .andWhere('contacts.deleted_at IS NULL');
 
-    // 4. FILTER: Status (can be array or single value)
-    if (filters.status) {
+    // 4. FILTER: Status (can be array, string, or number)
+    // Normaliza para array de números para garantir compatibilidade
+    if (
+      filters.status !== undefined &&
+      filters.status !== null &&
+      filters.status !== ''
+    ) {
+      let statuses: number[];
+
       if (Array.isArray(filters.status)) {
-        // If array, use IN clause
-        query.andWhere('contacts.status IN (:...statuses)', {
-          statuses: filters.status,
-        });
+        // Already an array - convert each element to number
+        statuses = filters.status.map((s) => Number(s));
+      } else if (typeof filters.status === 'string') {
+        // Can come as "1" or "1,2,3" from query string
+        statuses = filters.status
+          .split(',')
+          .map((s) => Number(s.trim()))
+          .filter((n) => !isNaN(n));
       } else {
-        // If single value
-        query.andWhere('contacts.status = :status', { status: filters.status });
+        // Single number value
+        statuses = [Number(filters.status)];
+      }
+
+      // Only apply filter if we have valid statuses
+      if (statuses.length > 0) {
+        query.andWhere('contacts.status IN (:...statuses)', { statuses });
       }
     }
 
@@ -237,14 +371,27 @@ export class ContactsService {
       .andWhere('c.deleted_at IS NULL')
       .groupBy('c.number');
 
-    // Apply filters mirror to subquery
-    if (filters.status) {
+    // Apply filters mirror to subquery (same normalization as main query)
+    if (
+      filters.status !== undefined &&
+      filters.status !== null &&
+      filters.status !== ''
+    ) {
+      let subStatuses: number[];
+
       if (Array.isArray(filters.status)) {
-        idsSubquery.andWhere('c.status IN (:...statuses)', {
-          statuses: filters.status,
-        });
+        subStatuses = filters.status.map((s) => Number(s));
+      } else if (typeof filters.status === 'string') {
+        subStatuses = filters.status
+          .split(',')
+          .map((s) => Number(s.trim()))
+          .filter((n) => !isNaN(n));
       } else {
-        idsSubquery.andWhere('c.status = :status', { status: filters.status });
+        subStatuses = [Number(filters.status)];
+      }
+
+      if (subStatuses.length > 0) {
+        idsSubquery.andWhere('c.status IN (:...subStatuses)', { subStatuses });
       }
     }
     if (filters.tag) {
@@ -267,15 +414,31 @@ export class ContactsService {
     const idsRaw = await idsSubquery.getRawMany();
     const ids = idsRaw.map((r: any) => r.maxId);
 
-    const contacts = ids.length
+    // Paginação
+    const page = Math.max(1, Number(filters.page) || 1);
+    const perPage = Math.min(100, Math.max(1, Number(filters.per_page) || 20));
+    const totalCount = ids.length;
+    const lastPage = Math.ceil(totalCount / perPage) || 1;
+    const offset = (page - 1) * perPage;
+
+    // Aplicar paginação aos IDs
+    const paginatedIds = ids.slice(offset, offset + perPage);
+
+    const contacts = paginatedIds.length
       ? await this.contactRepository.find({
-          where: { id: In(ids) },
+          where: { id: In(paginatedIds) },
           order: { id: 'DESC' },
         })
       : [];
 
     return {
       data: contacts,
+      meta: {
+        total: totalCount,
+        page,
+        per_page: perPage,
+        last_page: lastPage,
+      },
     };
   }
 
@@ -306,8 +469,11 @@ export class ContactsService {
       },
     });
 
+    this.logger.log(`🔍 getIndicators para user ${userId}: numberActive=${JSON.stringify(numberActive ? { id: numberActive.id, instance: numberActive.instance, cel: numberActive.cel, status: numberActive.status } : null)}`);
+
     // Return default values if no active WhatsApp number found
-    if (!numberActive || !numberActive.cel) {
+    if (!numberActive) {
+      this.logger.warn(`⚠️ Nenhum número ativo encontrado para user ${userId}`);
       return {
         data: {
           total: 0,
@@ -318,8 +484,59 @@ export class ContactsService {
       };
     }
 
-    // 2. Normalize cel_owner
-    const normalizedCel = NumberHelper.formatNumber(numberActive.cel);
+    // 2. Get cel - try to fetch from Evolution if not available
+    let ownerCel = numberActive.cel;
+    if (!ownerCel && numberActive.instance) {
+      try {
+        const pgUri =
+          process.env.EVOLUTION_PG_URI ||
+          'postgres://postgres:postgres@localhost:5433/evolution';
+        const pg = new PgClient({ connectionString: pgUri });
+        await pg.connect();
+        const res = await pg.query(
+          'SELECT "ownerJid" FROM "Instance" WHERE name = $1 LIMIT 1',
+          [numberActive.instance],
+        );
+        const row = res.rows?.[0];
+        await pg.end();
+        if (row?.ownerJid) {
+          ownerCel = row.ownerJid.replace(/@.*/, '');
+          await this.numberRepository.update(numberActive.id, { cel: ownerCel });
+        }
+      } catch {
+        ownerCel = numberActive.instance;
+      }
+    }
+
+    if (!ownerCel) {
+      return {
+        data: {
+          total: 0,
+          totalBlocked: 0,
+          totalActive: 0,
+          totalInactive: 0,
+        },
+      };
+    }
+
+    // 3. Normalize cel_owner
+    const normalizedCel = NumberHelper.formatNumber(ownerCel) || ownerCel;
+
+    this.logger.log(`📊 getIndicators: ownerCel=${ownerCel}, normalizedCel=${normalizedCel}, numberId=${numberActive.id}`);
+
+    // DEBUG: Check what values are actually stored in contacts table
+    const sampleContacts = await this.contactRepository.find({
+      where: { user_id: userId },
+      select: ['id', 'number', 'cel_owner', 'number_id', 'status'],
+      take: 5,
+    });
+    this.logger.log(`🔍 Sample contacts in DB: ${JSON.stringify(sampleContacts)}`);
+
+    // DEBUG: Count all contacts for this user (without cel_owner filter)
+    const totalCountAll = await this.contactRepository.count({
+      where: { user_id: userId, deleted_at: IsNull() },
+    });
+    this.logger.log(`🔍 Total contacts for user ${userId} (all): ${totalCountAll}`);
 
     // 3. Base query for all metrics
     const baseQuery = this.contactRepository
@@ -359,6 +576,8 @@ export class ContactsService {
       .select('COUNT(DISTINCT contacts.number)', 'count')
       .getRawOne();
     const totalInactive = parseInt(inactiveResult?.count ?? '0', 10) || 0;
+
+    this.logger.log(`✅ getIndicators result: total=${total}, totalActive=${totalActive}, totalBlocked=${totalBlocked}, totalInactive=${totalInactive}`);
 
     return {
       data: {
@@ -509,6 +728,54 @@ export class ContactsService {
       data: {
         id: uniqueId,
         unblocked: result.affected,
+      },
+    };
+  }
+
+  /**
+   * DELETE /api/v1/contacts
+   * Remove all contacts from the user
+   *
+   * Business Rules:
+   * 1. Removes ALL contacts from the user
+   * 2. Filtered by active WhatsApp number (cel_owner)
+   * 3. Uses soft delete to maintain data integrity
+   * 4. Called automatically when WhatsApp is disconnected
+   * 5. User can only remove their own contacts (user_id filter)
+   *
+   * Security:
+   * - Filtered by user_id to ensure users can only remove their own contacts
+   * - Also filtered by active WhatsApp number (cel_owner)
+   */
+  async removeAll(userId: number) {
+    // 1. Find active WhatsApp number for user
+    const numberActive = await this.numberRepository.findOne({
+      where: {
+        user_id: userId,
+        status: 1, // Active number
+      },
+    });
+
+    if (!numberActive) {
+      throw new NotFoundException(
+        'Nenhum número WhatsApp ativo encontrado para este usuário.',
+      );
+    }
+
+    // 2. Get normalized phone number (cel_owner)
+    const celOwner = numberActive.cel;
+
+    // 3. Soft delete ALL contacts from this user with this cel_owner
+    const result = await this.contactRepository.softDelete({
+      user_id: userId, // Security filter - only user's own contacts
+      cel_owner: celOwner, // Only contacts from active WhatsApp number
+    });
+
+    // 4. Return success with count of deleted contacts
+    return {
+      data: {
+        deleted: result.affected || 0,
+        message: `${result.affected || 0} contatos removidos com sucesso`,
       },
     };
   }

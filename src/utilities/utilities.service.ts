@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, MoreThan, IsNull } from 'typeorm';
+import { Repository, LessThan, MoreThan, IsNull, Not } from 'typeorm';
 import { Campaign } from '../database/entities/campaign.entity';
 import { Contact } from '../database/entities/contact.entity';
 import { Configuration } from '../database/entities/configuration.entity';
+import { ContactsService } from '../contacts/contacts.service';
 
 /**
  * UtilitiesService
@@ -16,6 +17,8 @@ import { Configuration } from '../database/entities/configuration.entity';
  */
 @Injectable()
 export class UtilitiesService {
+  private readonly logger = new Logger(UtilitiesService.name);
+
   constructor(
     @InjectRepository(Campaign)
     private readonly campaignRepository: Repository<Campaign>,
@@ -23,6 +26,7 @@ export class UtilitiesService {
     private readonly contactRepository: Repository<Contact>,
     @InjectRepository(Configuration)
     private readonly configurationRepository: Repository<Configuration>,
+    private readonly contactsService: ContactsService,
   ) {}
 
   /**
@@ -174,12 +178,16 @@ export class UtilitiesService {
    * Status de sincronização de contatos
    */
   async getContactsSyncStatus(userId: number) {
+    this.logger.log(`🔍 Buscando status de contatos para user ${userId}`);
+
     const totalContacts = await this.contactRepository.count({
       where: {
         user_id: userId,
         deleted_at: IsNull(),
       },
     });
+
+    this.logger.log(`📊 Total de contatos para user ${userId}: ${totalContacts}`);
 
     const activeContacts = await this.contactRepository.count({
       where: {
@@ -189,27 +197,90 @@ export class UtilitiesService {
       },
     });
 
-    return {
+    // Contar públicos em campanhas (campaign_publics)
+    // NOTA: Campaign tem relação 'public' (singular), não 'publics'
+    // Vamos contar campanhas que têm público associado
+    const campaignPublicsCount = await this.campaignRepository
+      .count({
+        where: {
+          user_id: userId,
+          public_id: Not(IsNull()), // Conta campanhas que têm público associado (NOT IsNull)
+          deleted_at: IsNull(),
+        },
+      });
+
+    const result = {
       total_contacts: totalContacts,
       active_contacts: activeContacts,
       blocked_contacts: totalContacts - activeContacts,
       sync_status: 'completed',
       last_sync: new Date().toISOString(),
+      // Estrutura esperada pelo frontend
+      summary: {
+        backend_contacts: totalContacts,
+        whatsapp_conversations: totalContacts, // Renomeado de waha_conversations
+        campaign_publics: campaignPublicsCount,
+      },
     };
+
+    this.logger.log(
+      `📊 Status de contatos para user ${userId}: ${totalContacts} total, ${activeContacts} ativos, ${campaignPublicsCount} públicos em campanhas`,
+    );
+    this.logger.log(`📦 Retornando:`, JSON.stringify(result));
+
+    return result;
   }
 
   /**
    * Sincronização manual de contatos
+   * Agora realmente sincroniza contatos do Evolution API
    */
-  async manualContactsSync(userId: number) {
-    // Placeholder para sincronização manual
-    // Na implementação real, isso dispararia um job assíncrono
-    return {
-      success: true,
-      message: 'Sincronização manual iniciada',
-      user_id: userId,
-      timestamp: new Date().toISOString(),
-    };
+  async manualContactsSync(userId: number, instanceName?: string) {
+    this.logger.log(
+      `📱 Iniciando sincronização manual de contatos para user ${userId} (instance: ${instanceName || 'default'})`,
+    );
+
+    try {
+      // Chamar syncFromEvolution do ContactsService
+      const result = await this.contactsService.syncFromEvolution(userId);
+
+      // Calcular skipped (total - imported = contatos que já existiam ou foram filtrados)
+      const skippedCount = result.total - result.imported;
+
+      this.logger.log(
+        `✅ Sincronização concluída: ${result.imported} contatos importados de ${result.total} total (${skippedCount} ignorados)`,
+      );
+
+      return {
+        success: true,
+        message: 'Sincronização de contatos concluída',
+        method: 'Evolution API', // Campo adicionado para o frontend
+        user_id: userId,
+        // Campos esperados pelo frontend
+        importedCount: result.imported,
+        skippedCount: skippedCount,
+        totalContactsFound: result.total,
+        // Campos originais (backward compatibility)
+        total: result.total,
+        imported: result.imported,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `❌ Erro na sincronização de contatos: ${error instanceof Error ? error.message : String(error)}`,
+      );
+
+      return {
+        success: false,
+        message: `Erro na sincronização: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
+        method: 'Evolution API',
+        user_id: userId,
+        importedCount: 0,
+        skippedCount: 0,
+        totalContactsFound: 0,
+        timestamp: new Date().toISOString(),
+      };
+    }
   }
 
   /**

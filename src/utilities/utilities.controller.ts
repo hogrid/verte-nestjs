@@ -18,6 +18,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UtilitiesService } from './utilities.service';
+import { SyncContactsDto } from './dto/sync-contacts.dto';
 
 /**
  * UtilitiesController
@@ -474,12 +475,30 @@ export class UtilitiesController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Sincronização manual',
-    description: 'Inicia sincronização manual de contatos',
+    description: 'Inicia sincronização manual de contatos do Evolution API',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        instanceName: {
+          type: 'string',
+          description: 'Nome da instância WhatsApp para sincronizar contatos',
+        },
+      },
+      required: ['instanceName'],
+    },
   })
   @ApiResponse({ status: 200, description: 'Sincronização iniciada' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  async manualContactsSync(@Request() req: { user: { id: number } }) {
-    return this.utilitiesService.manualContactsSync(req.user.id);
+  async manualContactsSync(
+    @Request() req: { user: { id: number } },
+    @Body() syncDto: SyncContactsDto,
+  ) {
+    return this.utilitiesService.manualContactsSync(
+      req.user.id,
+      syncDto.instanceName,
+    );
   }
 
   /**

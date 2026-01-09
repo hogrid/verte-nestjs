@@ -8,6 +8,8 @@ import {
   Post,
   UseGuards,
   NotFoundException,
+  BadRequestException,
+  Request,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -28,23 +30,23 @@ import { Repository } from 'typeorm';
 import { Number as WhatsAppNumber } from '../database/entities/number.entity';
 import { SendPollDto } from './dto/send-poll.dto';
 
-class WahaQrDto {
+class InstanceQrDto {
   @IsDefined()
   @IsString()
   @IsNotEmpty()
   session!: string;
 }
 
-class WahaDisconnectDto {
+class InstanceDisconnectDto {
   @IsDefined()
   @IsString()
   @IsNotEmpty()
   session!: string;
 }
 
-@ApiTags('WhatsApp (WAHA Compatibility)')
+@ApiTags('WhatsApp (Legacy Compatibility)')
 @Controller('api/v1')
-export class WahaCompatController {
+export class LegacyCompatController {
   constructor(
     private readonly whatsappService: WhatsappService,
     @Inject(WHATSAPP_PROVIDER)
@@ -57,13 +59,13 @@ export class WahaCompatController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Gerar QR Code (WAHA compat)' })
+  @ApiOperation({ summary: 'Gerar QR Code (Legacy compat)' })
   @ApiBody({
     schema: { type: 'object', properties: { session: { type: 'string' } } },
   })
   @ApiResponse({ status: 200, description: 'QR Code gerado' })
   @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
-  async generateQr(@Body() body: WahaQrDto) {
+  async generateQr(@Body() body: InstanceQrDto) {
     const res = await this.whatsappProvider.getQrCode(body.session);
     if (!res.qrcode && !res.base64) {
       throw new NotFoundException('Sessão não encontrada');
@@ -74,7 +76,7 @@ export class WahaCompatController {
   @Get('waha/sessions/:sessionName')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Status da sessão (WAHA compat)' })
+  @ApiOperation({ summary: 'Status da sessão (Legacy compat)' })
   @ApiParam({ name: 'sessionName', example: 'default' })
   @ApiResponse({ status: 200, description: 'Status retornado' })
   @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
@@ -98,39 +100,162 @@ export class WahaCompatController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Desconectar sessão (WAHA compat)' })
+  @ApiOperation({
+    summary: 'Desconectar sessão (Legacy compat)',
+    description: 'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
+  })
   @ApiBody({
     schema: { type: 'object', properties: { session: { type: 'string' } } },
   })
   @ApiResponse({ status: 200, description: 'Sessão desconectada' })
-  async disconnect(@Body() body: WahaDisconnectDto) {
-    try {
-      await this.whatsappProvider.deleteInstance(body.session);
-    } catch (_e) {
-      void 0;
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
+  async disconnect(@Request() req: { user: { id: number } }, @Body() body: InstanceDisconnectDto) {
+    if (!body.session) {
+      throw new BadRequestException('Nome da sessão é obrigatório');
     }
-    return { success: true };
+
+    // Validar que o usuário é dono da instância
+    const number = await this.numberRepository.findOne({
+      where: {
+        user_id: req.user.id,
+        instance: body.session,
+        status: 1,
+      },
+    });
+
+    if (!number) {
+      throw new NotFoundException(
+        'Sessão não encontrada ou não pertence a este usuário',
+      );
+    }
+
+    // Usar disconnectInstance (logout) em vez de deleteInstance
+    try {
+      await this.whatsappProvider.disconnectInstance(body.session);
+    } catch (_e) {
+      // Continuar mesmo se erro no Evolution API
+    }
+
+    // Atualizar banco de dados
+    await this.numberRepository.update(number.id, {
+      status_connection: 0,
+    });
+
+    return { success: true, message: 'Desconectado com sucesso' };
   }
 
-  @Post('disconnect-waha-session')
+  @Post('whatsapp/disconnect')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Desconectar sessão pública (compat)' })
+  @ApiOperation({
+    summary: 'Desconectar sessão (Novo endpoint)',
+    description: 'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
+  })
   @ApiBody({
     schema: { type: 'object', properties: { session: { type: 'string' } } },
   })
-  @ApiResponse({ status: 200 })
-  async disconnectPublic(@Body('session') session = 'default') {
-    try {
-      await this.whatsappProvider.deleteInstance(session);
-    } catch (_e) {
-      void 0;
+  @ApiResponse({ status: 200, description: 'Sessão desconectada' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
+  async disconnectWhatsapp(@Request() req: { user: { id: number } }, @Body() body: InstanceDisconnectDto) {
+    // Chama o mesmo método do endpoint antigo para manter compatibilidade
+    return this.disconnect(req, body);
+  }
+
+  @Post('disconnect-waha-session')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Desconectar sessão WhatsApp (logout)',
+    description: 'Desconeta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        instanceName: { type: 'string', description: 'Nome da instância a desconectar' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Desconectado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Instância não encontrada' })
+  async disconnectPublic(
+    @Request() req: { user: { id: number } },
+    @Body('instanceName') instanceName: string,
+  ) {
+    if (!instanceName) {
+      throw new BadRequestException('Nome da instância é obrigatório');
     }
-    return { success: true };
+
+    // Validar que o usuário é dono da instância
+    const number = await this.numberRepository.findOne({
+      where: {
+        user_id: req.user.id,
+        instance: instanceName,
+        status: 1,
+      },
+    });
+
+    if (!number) {
+      throw new NotFoundException(
+        'Instância não encontrada ou não pertence a este usuário',
+      );
+    }
+
+    // Usar disconnectInstance (logout) em vez de deleteInstance
+    // Isso mantém a instância para possível reconexão futura
+    try {
+      await this.whatsappProvider.disconnectInstance(instanceName);
+    } catch (_e) {
+      // Continuar mesmo se erro no Evolution API
+      // Apenas atualizamos o banco de dados
+    }
+
+    // Atualizar banco de dados
+    await this.numberRepository.update(number.id, {
+      status_connection: 0,
+    });
+
+    return {
+      success: true,
+      message: 'Desconectado com sucesso',
+    };
+  }
+
+  @Post('disconnect-whatsapp-session')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Desconectar sessão WhatsApp (logout) - Novo endpoint',
+    description: 'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        instanceName: { type: 'string', description: 'Nome da instância a desconectar' },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Desconectado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 404, description: 'Instância não encontrada' })
+  async disconnectWhatsappSession(
+    @Request() req: { user: { id: number } },
+    @Body('instanceName') instanceName: string,
+  ) {
+    // Chama o mesmo método do endpoint antigo para manter compatibilidade
+    return this.disconnectPublic(req, instanceName);
   }
 
   @Post('webhook-whatsapp')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Webhook WAHA compatível' })
+  @ApiOperation({ summary: 'Webhook Evolution API compatível' })
   @ApiResponse({ status: 200 })
   async webhookWhatsapp(@Body() payload: any) {
     return this.whatsappService.handleWebhook(payload);
@@ -138,7 +263,7 @@ export class WahaCompatController {
 
   @Post('webhook-whatsapp-extractor')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Webhook extractor compatível' })
+  @ApiOperation({ summary: 'Webhook extractor compatível (Legacy)' })
   @ApiResponse({ status: 200 })
   async webhookExtractor(@Body() payload: any) {
     return { success: true };
