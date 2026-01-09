@@ -999,6 +999,18 @@ export class WhatsappService {
 
     this.logger.log(`✅ Status de desconexão salvo no banco para instância: ${instanceName}`);
 
+    // Limpar todos os contatos do usuário ao desconectar
+    try {
+      this.logger.log(`🗑️ Limpando contatos do usuário ${userId}...`);
+      const deleteResult = await this.contactsService.removeAll(userId);
+      this.logger.log(`✅ Contatos removidos: ${deleteResult?.data?.deleted || 0}`);
+    } catch (contactsError) {
+      this.logger.warn(
+        `⚠️ Erro ao limpar contatos (continuando...): ${contactsError instanceof Error ? contactsError.message : String(contactsError)}`,
+      );
+      // Não falhar a desconexão se falhar ao limpar contatos
+    }
+
     return {
       success: true,
       message: 'Desconectado com sucesso',

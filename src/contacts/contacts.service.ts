@@ -69,13 +69,17 @@ export class ContactsService {
     this.logger.log(`🔄 Iniciando syncFromEvolution para user ${userId}`);
 
     const numberActive = await this.numberRepository.findOne({
-      where: { user_id: userId, status: 1 },
+      where: {
+        user_id: userId,
+        status: 1,
+        status_connection: 1, // IMPORTANTE: Só sincronizar se WhatsApp estiver conectado
+      },
     });
     if (!numberActive) {
-      this.logger.error(`❌ Nenhum número ativo encontrado para user ${userId}`);
-      throw new NotFoundException(
-        'Nenhum número WhatsApp ativo encontrado para este usuário.',
+      this.logger.warn(
+        `⚠️ Sincronização ignorada: nenhum número ativo E conectado para user ${userId}`,
       );
+      return { total: 0, imported: 0 };
     }
 
     this.logger.log(`✅ Número ativo encontrado: ${numberActive.instance} (cel: ${numberActive.cel})`);
@@ -608,13 +612,21 @@ export class ContactsService {
     userId: number,
     updateDto: UpdateContactsStatusDto,
   ) {
-    const { rows, status } = updateDto;
+    // Aceita tanto 'rows' (Laravel/frontend) quanto 'contact_ids' (formato novo)
+    const contactIds = updateDto.rows || updateDto.contact_ids;
+    const { status } = updateDto;
+
+    if (!contactIds || contactIds.length === 0) {
+      throw new BadRequestException(
+        'Nenhum ID de contato fornecido.',
+      );
+    }
 
     // SECURITY: Filter by user_id (Laravel doesn't do this - SECURITY FLAW!)
     // This ensures users can only update their own contacts
     const result = await this.contactRepository.update(
       {
-        id: In(rows),
+        id: In(contactIds),
         user_id: userId, // Security filter (not in Laravel!)
       },
       {
@@ -745,37 +757,25 @@ export class ContactsService {
    *
    * Security:
    * - Filtered by user_id to ensure users can only remove their own contacts
-   * - Also filtered by active WhatsApp number (cel_owner)
+   *
+   * Note: Removes ALL contacts regardless of source (WhatsApp, CSV, Publics)
    */
   async removeAll(userId: number) {
-    // 1. Find active WhatsApp number for user
-    const numberActive = await this.numberRepository.findOne({
-      where: {
-        user_id: userId,
-        status: 1, // Active number
-      },
-    });
+    this.logger.log(`🗑️ Removendo TODOS os contatos do usuário ${userId}...`);
 
-    if (!numberActive) {
-      throw new NotFoundException(
-        'Nenhum número WhatsApp ativo encontrado para este usuário.',
-      );
-    }
-
-    // 2. Get normalized phone number (cel_owner)
-    const celOwner = numberActive.cel;
-
-    // 3. Soft delete ALL contacts from this user with this cel_owner
+    // Soft delete de TODOS os contatos do usuário (independente de cel_owner)
+    // Isso garante que contatos de todas as fontes (WhatsApp, CSV, Publics) sejam removidos
     const result = await this.contactRepository.softDelete({
-      user_id: userId, // Security filter - only user's own contacts
-      cel_owner: celOwner, // Only contacts from active WhatsApp number
+      user_id: userId,
     });
 
-    // 4. Return success with count of deleted contacts
+    const deletedCount = result.affected || 0;
+    this.logger.log(`✅ ${deletedCount} contatos removidos com sucesso`);
+
     return {
       data: {
-        deleted: result.affected || 0,
-        message: `${result.affected || 0} contatos removidos com sucesso`,
+        deleted: deletedCount,
+        message: `${deletedCount} contatos removidos com sucesso`,
       },
     };
   }
