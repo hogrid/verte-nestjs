@@ -136,6 +136,28 @@ export class AuthService {
    * Compatible with Laravel UserService@addUser
    */
   async register(registerDto: RegisterDto) {
+    // Check if email already exists
+    const existingUser = await this.userRepository.findOne({
+      where: { email: registerDto.email },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException({
+        errors: {
+          email: ['Este email já está cadastrado.'],
+        },
+      });
+    }
+
+    // Check if passwords match
+    if (registerDto.password !== registerDto.password_confirmation) {
+      throw new BadRequestException({
+        errors: {
+          password_confirmation: ['As senhas não coincidem.'],
+        },
+      });
+    }
+
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
     const now = new Date();
 
