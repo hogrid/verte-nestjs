@@ -49,11 +49,6 @@ export class StripeService {
     successUrl: string;
     cancelUrl: string;
   }): Promise<Stripe.Checkout.Session> {
-    this.logger.log('💳 Criando sessão de checkout Stripe', {
-      planName: params.planName,
-      planPrice: params.planPrice,
-      userId: params.userId,
-    });
 
     if (this.mockMode) {
       // Retorna sessão mockada (modo de teste)
@@ -92,21 +87,11 @@ export class StripeService {
         client_reference_id: params.userId.toString(),
       });
 
-      this.logger.log('✅ Sessão de checkout criada', {
-        sessionId: session.id,
-        url: session.url,
-      });
-
       return session;
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao criar sessão de checkout', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -162,21 +147,11 @@ export class StripeService {
         webhookSecret,
       );
 
-      this.logger.log('✅ Evento webhook validado', {
-        type: event.type,
-        id: event.id,
-      });
-
       return event;
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao validar webhook', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -198,22 +173,11 @@ export class StripeService {
     try {
       const session = await this.stripe.checkout.sessions.retrieve(sessionId);
 
-      this.logger.log('✅ Sessão recuperada', {
-        sessionId: session.id,
-        paymentStatus: session.payment_status,
-      });
-
       return session;
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao recuperar sessão', {
-        sessionId,
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -236,22 +200,109 @@ export class StripeService {
       const paymentIntent =
         await this.stripe.paymentIntents.retrieve(paymentIntentId);
 
-      this.logger.log('✅ Payment intent recuperado', {
-        paymentIntentId: paymentIntent.id,
-        status: paymentIntent.status,
+      return paymentIntent;
+    } catch (error: unknown) {
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Create payment intent with payment method
+   * Cria PaymentIntent e processa pagamento com PaymentMethod existente
+   * Usado para pagamento direto com cartão via Stripe Elements
+   */
+  async createPaymentWithMethod(params: {
+    amount: number; // Valor em reais
+    currency: string;
+    paymentMethodId: string; // pm_xxx do Stripe Elements
+    userId: number;
+    planId: number;
+    email: string;
+    name: string;
+  }): Promise<Stripe.PaymentIntent> {
+    if (this.mockMode) {
+      // Retorna PaymentIntent mockado em modo de teste
+      const mockPaymentIntent = {
+        id: `pi_test_${Date.now()}`,
+        object: 'payment_intent',
+        amount: Math.round(params.amount * 100),
+        currency: params.currency.toLowerCase(),
+        status: 'succeeded',
+        payment_method: params.paymentMethodId,
+      } as unknown as Stripe.PaymentIntent;
+      return mockPaymentIntent;
+    }
+
+    try {
+      // Criar PaymentIntent com o PaymentMethod fornecido
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: Math.round(params.amount * 100), // Converter para centavos
+        currency: params.currency.toLowerCase(),
+        payment_method: params.paymentMethodId,
+        confirm: true, // Confirmar o pagamento imediatamente
+        metadata: {
+          user_id: params.userId.toString(),
+          plan_id: params.planId.toString(),
+          name: params.name,
+          email: params.email,
+        },
+        return_url: `${this.configService.get<string>(
+          'FRONTEND_URL',
+          'http://localhost:3001',
+        )}/payment-success`,
       });
 
       return paymentIntent;
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao recuperar payment intent', {
-        paymentIntentId,
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Create PaymentIntent without confirmation
+   * Cria PaymentIntent para ser confirmado no cliente (útil para 3D Secure)
+   */
+  async createPaymentIntent(params: {
+    amount: number;
+    currency: string;
+    userId: number;
+    planId: number;
+    email: string;
+  }): Promise<{ clientSecret: string; paymentIntentId: string }> {
+    if (this.mockMode) {
+      return {
+        clientSecret: `pi_test_${Date.now()}_secret_${Date.now()}`,
+        paymentIntentId: `pi_test_${Date.now()}`,
+      };
+    }
+
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.create({
+        amount: Math.round(params.amount * 100),
+        currency: params.currency.toLowerCase(),
+        metadata: {
+          user_id: params.userId.toString(),
+          plan_id: params.planId.toString(),
+          email: params.email,
+        },
+        // Automatic payment methods (card, etc)
+        payment_method_types: ['card'],
       });
+
+      return {
+        clientSecret: paymentIntent.client_secret as string,
+        paymentIntentId: paymentIntent.id,
+      };
+    } catch (error: unknown) {
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }

@@ -6,6 +6,7 @@ import { User } from '../database/entities/user.entity';
 import { Plan } from '../database/entities/plan.entity';
 import { StripeService } from './stripe.service';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
 import type Stripe from 'stripe';
 
 /**
@@ -33,11 +34,6 @@ export class PaymentsService {
    * Laravel: PaymentsController@createCheckoutSession
    */
   async createCheckoutSession(userId: number, dto: CreateCheckoutSessionDto) {
-    this.logger.log('🛒 Criando sessão de checkout', {
-      userId,
-      planId: dto.plan_id,
-    });
-
     try {
       // Find plan
       const plan = await this.planRepository.findOne({
@@ -89,29 +85,17 @@ export class PaymentsService {
 
       const savedPayment = await this.paymentRepository.save(payment);
 
-      this.logger.log('✅ Checkout session criada', {
-        sessionId: session.id,
-        paymentId: savedPayment.id,
-      });
-
       const result = {
         session_id: session.id,
         url: session.url,
         payment_id: savedPayment.id,
       };
 
-      this.logger.log('✅ Retornando resultado', result);
       return result;
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao criar checkout session', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -121,11 +105,6 @@ export class PaymentsService {
    * Laravel: PaymentsController@stripeWebhook
    */
   async handleStripeWebhook(event: Stripe.Event) {
-    this.logger.log('📥 Processando webhook Stripe', {
-      type: event.type,
-      id: event.id,
-    });
-
     try {
       switch (event.type) {
         case 'checkout.session.completed':
@@ -139,21 +118,13 @@ export class PaymentsService {
         case 'payment_intent.payment_failed':
           await this.handlePaymentIntentFailed(event.data.object);
           break;
-
-        default:
-          this.logger.debug(`🔔 Evento não tratado: ${event.type}`);
       }
 
       return { received: true };
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar webhook', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -164,11 +135,6 @@ export class PaymentsService {
   private async handleCheckoutSessionCompleted(
     session: Stripe.Checkout.Session,
   ) {
-    this.logger.log('✅ Checkout session completada', {
-      sessionId: session.id,
-      paymentStatus: session.payment_status,
-    });
-
     try {
       // Find payment by session ID (stored in payment_id)
       const payment = await this.paymentRepository.findOne({
@@ -176,9 +142,6 @@ export class PaymentsService {
       });
 
       if (!payment) {
-        this.logger.warn('⚠️ Payment não encontrado para session', {
-          sessionId: session.id,
-        });
         return;
       }
 
@@ -193,21 +156,11 @@ export class PaymentsService {
           plan_id: payment.plan_id,
           active: 1,
         });
-
-        this.logger.log('✅ Usuário atualizado com plano', {
-          userId: payment.user_id,
-          planId: payment.plan_id,
-        });
       }
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar checkout completed', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
@@ -217,10 +170,6 @@ export class PaymentsService {
   private async handlePaymentIntentSucceeded(
     paymentIntent: Stripe.PaymentIntent,
   ) {
-    this.logger.log('✅ Payment intent succeeded', {
-      paymentIntentId: paymentIntent.id,
-    });
-
     try {
       // Find payment by payment intent ID (stored in payment_id if available)
       const payment = await this.paymentRepository.findOne({
@@ -228,9 +177,6 @@ export class PaymentsService {
       });
 
       if (!payment) {
-        this.logger.warn('⚠️ Payment não encontrado para payment intent', {
-          paymentIntentId: paymentIntent.id,
-        });
         return;
       }
 
@@ -239,14 +185,9 @@ export class PaymentsService {
         status: 'succeeded',
       });
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar payment succeeded', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
@@ -254,10 +195,6 @@ export class PaymentsService {
    * Handle payment intent failed
    */
   private async handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent) {
-    this.logger.log('❌ Payment intent failed', {
-      paymentIntentId: paymentIntent.id,
-    });
-
     try {
       // Find payment by payment intent ID (stored in payment_id if available)
       const payment = await this.paymentRepository.findOne({
@@ -265,9 +202,6 @@ export class PaymentsService {
       });
 
       if (!payment) {
-        this.logger.warn('⚠️ Payment não encontrado para payment intent', {
-          paymentIntentId: paymentIntent.id,
-        });
         return;
       }
 
@@ -276,14 +210,9 @@ export class PaymentsService {
         status: 'failed',
       });
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar payment failed', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
     }
   }
 
@@ -292,8 +221,6 @@ export class PaymentsService {
    * Laravel: PaymentsController@paymentSuccess
    */
   async handlePaymentSuccess(sessionId: string) {
-    this.logger.log('🎉 Processando payment success', { sessionId });
-
     try {
       // Retrieve session from Stripe
       const session =
@@ -322,14 +249,9 @@ export class PaymentsService {
           : null,
       };
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar payment success', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
-      });
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }
@@ -339,8 +261,6 @@ export class PaymentsService {
    * Laravel: PaymentsController@paymentCancel
    */
   async handlePaymentCancel(sessionId?: string) {
-    this.logger.log('❌ Processando payment cancel', { sessionId });
-
     try {
       if (sessionId) {
         // Find and update payment by session ID (stored in payment_id)
@@ -360,14 +280,130 @@ export class PaymentsService {
         message: 'Pagamento cancelado pelo usuário',
       };
     } catch (error: unknown) {
-      this.logger.error('❌ Erro ao processar payment cancel', {
-        error:
-          error instanceof Error
-            ? error.message
-            : typeof error === 'string'
-              ? error
-              : JSON.stringify(error),
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Create direct payment with Stripe Elements
+   * Processa pagamento direto com cartão (Stripe Elements)
+   * Compatível com frontend PaymentPage.jsx
+   */
+  async createDirectPayment(
+    userId: number,
+    dto: CreatePaymentDto,
+  ): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      // Find plan
+      const plan = await this.planRepository.findOne({
+        where: { id: dto.plan_id },
       });
+
+      if (!plan) {
+        throw new NotFoundException('Plano não encontrado');
+      }
+
+      // Find user (use userId from JWT if not provided)
+      const targetUserId = dto.user_id || userId;
+      const user = await this.userRepository.findOne({
+        where: { id: targetUserId },
+      });
+
+      if (!user) {
+        throw new NotFoundException('Usuário não encontrado');
+      }
+
+      // Determinar valor final (valor promocional ou normal)
+      const finalAmount =
+        plan.value_promotion && plan.value_promotion > 0
+          ? plan.value_promotion
+          : Number(plan.value);
+
+      // Criar PaymentIntent com o PaymentMethod do Stripe Elements
+      const paymentIntent =
+        await this.stripeService.createPaymentWithMethod({
+          amount: finalAmount,
+          currency: 'BRL',
+          paymentMethodId: dto.cardToken,
+          userId: targetUserId,
+          planId: plan.id,
+          email: dto.email,
+          name: dto.name,
+        });
+
+      // Verificar status do pagamento
+      const paymentSuccess =
+        paymentIntent.status === 'succeeded' ||
+        paymentIntent.status === 'processing';
+
+      // Criar registro de pagamento
+      const payment = this.paymentRepository.create({
+        user_id: targetUserId,
+        plan_id: plan.id,
+        status:
+          paymentIntent.status === 'succeeded'
+            ? 'succeeded'
+            : paymentIntent.status === 'processing'
+              ? 'processing'
+              : 'pending',
+        payment_id: paymentIntent.id,
+        from: 'stripe',
+        amount: finalAmount,
+        extra_number: 0,
+      });
+
+      const savedPayment = await this.paymentRepository.save(payment);
+
+      // Se pagamento bem sucedido, atualizar usuário
+      if (paymentSuccess) {
+        await this.userRepository.update(targetUserId, {
+          plan_id: plan.id,
+          active: 1,
+        });
+
+        return {
+          success: true,
+          data: {
+            id: savedPayment.id,
+            payment_intent_id: paymentIntent.id,
+            status: paymentIntent.status,
+            plan: {
+              id: plan.id,
+              name: plan.name,
+              value: finalAmount,
+            },
+          },
+        };
+      }
+
+      // Pagamento requer ação adicional (ex: 3D Secure)
+      if (paymentIntent.status === 'requires_action') {
+        return {
+          success: false,
+          message: 'Pagamento requer autenticação adicional',
+          data: {
+            requires_action: true,
+            payment_intent_id: paymentIntent.id,
+            client_secret: paymentIntent.client_secret,
+          },
+        };
+      }
+
+      // Pagamento falhou
+      return {
+        success: false,
+        message: paymentIntent.last_payment_error?.message || 'Pagamento não aprovado',
+        data: {
+          status: paymentIntent.status,
+        },
+      };
+    } catch (error: unknown) {
+      this.logger.error(
+        error instanceof Error ? error.message : String(error),
+      );
       throw error;
     }
   }

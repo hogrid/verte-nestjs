@@ -24,6 +24,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PaymentsService } from './payments.service';
 import { StripeService } from './stripe.service';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
+import { CreatePaymentDto } from './dto/create-payment.dto';
 
 /**
  * PaymentsController
@@ -31,7 +32,7 @@ import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
  * Gerencia pagamentos via Stripe
  * Mantém 100% de compatibilidade com Laravel PaymentsController
  *
- * Total: 4 endpoints (apenas Stripe, sem MercadoPago)
+ * Total: 5 endpoints (apenas Stripe, sem MercadoPago)
  */
 @ApiTags('Payments')
 @Controller('api/v1')
@@ -73,6 +74,70 @@ export class PaymentsController {
     @Body() dto: CreateCheckoutSessionDto,
   ) {
     return this.paymentsService.createCheckoutSession(req.user.id, dto);
+  }
+
+  /**
+   * 1.5. POST /api/v1/create-payment
+   * Cria pagamento direto com Stripe Elements
+   * Compatível com frontend PaymentPage.jsx
+   */
+  @Post('create-payment')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Criar pagamento direto com Stripe Elements',
+    description:
+      'Processa pagamento direto com cartão usando PaymentMethod do Stripe Elements.\n\n' +
+      '**Fluxo:**\n' +
+      '- Frontend cria PaymentMethod com `stripe.createPaymentMethod()`\n' +
+      '- Envia payment_method_id (cardToken) para este endpoint\n' +
+      '- Backend cria PaymentIntent e confirma o pagamento\n' +
+      '- Retorna status do pagamento\n\n' +
+      '**Requer autenticação**: Opcional (user_id pode vir do body ou JWT)\n' +
+      '**Compatível com**: Laravel create-payment endpoint',
+  })
+  @ApiBody({ type: CreatePaymentDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Pagamento processado',
+    schema: {
+      example: {
+        success: true,
+        data: {
+          id: 1,
+          payment_intent_id: 'pi_123',
+          status: 'succeeded',
+          plan: {
+            id: 1,
+            name: 'Plano Pro',
+            value: 99.9,
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Pagamento requer autenticação adicional (3D Secure)',
+    schema: {
+      example: {
+        success: false,
+        message: 'Pagamento requer autenticação adicional',
+        data: {
+          requires_action: true,
+          payment_intent_id: 'pi_123',
+          client_secret: 'pi_123_secret_...',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Plano ou usuário não encontrado' })
+  async createDirectPayment(
+    @Request() req: { user?: { id: number } },
+    @Body() dto: CreatePaymentDto,
+  ) {
+    // Usa user_id do JWT se disponível, senão usa do body (para novos usuários)
+    const userId = req.user?.id || dto.user_id;
+    return this.paymentsService.createDirectPayment(userId, dto);
   }
 
   /**

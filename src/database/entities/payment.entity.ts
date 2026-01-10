@@ -11,7 +11,6 @@ import {
 } from 'typeorm';
 import type { User } from './user.entity';
 import type { Plan } from './plan.entity';
-import type { Number } from './number.entity';
 
 @Entity('payments')
 export class Payment {
@@ -23,9 +22,6 @@ export class Payment {
 
   @Column({ name: 'plan_id', type: 'bigint', unsigned: true })
   plan_id: number;
-
-  @Column({ name: 'number_id', type: 'bigint', unsigned: true, nullable: true })
-  number_id: number | null;
 
   @Column({ type: 'varchar', length: 150, nullable: true, default: '0' })
   status: string | null;
@@ -64,8 +60,4 @@ export class Payment {
   @ManyToOne('Plan', 'payments')
   @JoinColumn({ name: 'plan_id' })
   plan: Relation<Plan>;
-
-  @ManyToOne('Number', { nullable: true })
-  @JoinColumn({ name: 'number_id' })
-  number: Relation<Number>;
 }
