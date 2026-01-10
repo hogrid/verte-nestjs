@@ -4,8 +4,14 @@
 # Este arquivo contém apenas os serviços de infraestrutura
 # que precisam rodar junto com o backend NestJS
 #
+# Serviços:
+# - Evolution API (WhatsApp QR Code)
+# - PostgreSQL (banco do Evolution API)
+# - Redis (cache e filas)
+#
 # No Coolify: Crie uma aplicação do tipo "Docker Compose"
-# e cole este conteúdo, ou execute manualmente no servidor
+# e cole este conteúdo, ou execute manualmente no servidor:
+#   docker-compose -f docker-compose.services.yml up -d
 # ===========================================
 
 services:
@@ -27,6 +33,7 @@ services:
       - CACHE_REDIS_ENABLED=true
       - CACHE_REDIS_URI=redis://redis:6379
       - QRCODE_LIMIT=30
+      - CONFIG_SESSION_PHONE_CLIENT=Chrome
     volumes:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
@@ -34,9 +41,9 @@ services:
       - postgres
       - redis
     networks:
-      - VerteApp
+      - verte_network
 
-  # PostgreSQL para o Evolution API
+  # PostgreSQL para o Evolution API (banco separado do MySQL principal)
   postgres:
     container_name: evolution_postgres
     image: postgres:15-alpine
@@ -48,7 +55,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - VerteApp
+      - verte_network
 
   # Redis para cache e filas
   redis:
@@ -59,7 +66,7 @@ services:
     volumes:
       - redis_data:/data
     networks:
-      - VerteApp
+      - verte_network
 
 volumes:
   postgres_data:
@@ -72,6 +79,5 @@ volumes:
     driver: local
 
 networks:
-  VerteApp:
-    external: true
-    name: VerteApp
+  verte_network:
+    driver: bridge
