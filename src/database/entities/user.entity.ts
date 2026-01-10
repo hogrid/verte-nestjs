@@ -102,7 +102,12 @@ export class User {
   email_verified_at: Date | null;
 
   @Exclude()
-  @Column({ name: 'remember_token', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'remember_token',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   remember_token: string | null;
 
   @Column({ name: 'canceled_at', type: 'timestamp', nullable: true })

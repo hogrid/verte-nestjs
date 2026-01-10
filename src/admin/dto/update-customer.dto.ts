@@ -21,7 +21,9 @@ export class UpdateCustomerDto {
   email?: string;
 
   @IsString({ message: 'O campo password deve ser uma string.' })
-  @MinLength(6, { message: 'O campo password deve ter no mínimo 6 caracteres.' })
+  @MinLength(6, {
+    message: 'O campo password deve ter no mínimo 6 caracteres.',
+  })
   @IsOptional()
   password?: string;
 
@@ -37,11 +39,15 @@ export class UpdateCustomerDto {
   @IsOptional()
   plan_id?: number;
 
-  @IsEnum(['actived', 'inactived'], { message: 'O campo status deve ser actived ou inactived.' })
+  @IsEnum(['actived', 'inactived'], {
+    message: 'O campo status deve ser actived ou inactived.',
+  })
   @IsOptional()
   status?: 'actived' | 'inactived';
 
-  @IsEnum(['administrator', 'user'], { message: 'O campo profile deve ser administrator ou user.' })
+  @IsEnum(['administrator', 'user'], {
+    message: 'O campo profile deve ser administrator ou user.',
+  })
   @IsOptional()
   profile?: 'administrator' | 'user';
 }

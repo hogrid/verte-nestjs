@@ -61,7 +61,9 @@ export class ErrorTrackingService {
         error:
           updateError instanceof Error
             ? updateError.message
-            : String(updateError),
+            : typeof updateError === 'string'
+              ? updateError
+              : JSON.stringify(updateError),
       });
     }
   }
@@ -105,7 +107,9 @@ export class ErrorTrackingService {
         error:
           updateError instanceof Error
             ? updateError.message
-            : String(updateError),
+            : typeof updateError === 'string'
+              ? updateError
+              : JSON.stringify(updateError),
       });
     }
   }

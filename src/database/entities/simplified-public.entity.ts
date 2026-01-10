@@ -18,7 +18,12 @@ export class SimplifiedPublic {
   @Column({ name: 'number_id', type: 'bigint', unsigned: true, nullable: true })
   number_id: number | null;
 
-  @Column({ name: 'campaign_id', type: 'bigint', unsigned: true, nullable: true })
+  @Column({
+    name: 'campaign_id',
+    type: 'bigint',
+    unsigned: true,
+    nullable: true,
+  })
   campaign_id: number | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

@@ -83,7 +83,9 @@ export class SeederService implements OnModuleInit {
    * Fresh seed - clears all data and reseeds from scratch
    */
   async fresh() {
-    this.logger.log('🔄 Starting FRESH database seeding (clearing all data)...');
+    this.logger.log(
+      '🔄 Starting FRESH database seeding (clearing all data)...',
+    );
 
     // Clear tables in reverse dependency order (child tables first)
     await this.clearAllTables();
@@ -296,7 +298,10 @@ export class SeederService implements OnModuleInit {
     }
   }
 
-  private async seedNumbersForce(users: User[], servers: Server[]): Promise<Number[]> {
+  private async seedNumbersForce(
+    users: User[],
+    servers: Server[],
+  ): Promise<Number[]> {
     try {
       if (users.length === 0) {
         this.logger.log('📱 No users to create numbers for, skipping.');
@@ -326,7 +331,9 @@ export class SeederService implements OnModuleInit {
         const newNumber = this.numberRepository.create(numberData);
         const savedNumber = await this.numberRepository.save(newNumber);
         createdNumbers.push(savedNumber);
-        this.logger.log(`✅ Created number for user ${user.email}: ${savedNumber.cel}`);
+        this.logger.log(
+          `✅ Created number for user ${user.email}: ${savedNumber.cel}`,
+        );
       }
       return createdNumbers;
     } catch (error) {
@@ -335,7 +342,9 @@ export class SeederService implements OnModuleInit {
     }
   }
 
-  private async seedConfigurationsForce(users: User[]): Promise<Configuration[]> {
+  private async seedConfigurationsForce(
+    users: User[],
+  ): Promise<Configuration[]> {
     try {
       if (users.length === 0) {
         this.logger.log('🔧 No users to create configurations for, skipping.');
@@ -361,7 +370,10 @@ export class SeederService implements OnModuleInit {
     }
   }
 
-  private async seedLabelsForce(users: User[], numbers: Number[]): Promise<Label[]> {
+  private async seedLabelsForce(
+    users: User[],
+    numbers: Number[],
+  ): Promise<Label[]> {
     try {
       if (users.length === 0 || numbers.length === 0) {
         this.logger.log('🏷️ No users/numbers to create labels for, skipping.');
@@ -395,7 +407,9 @@ export class SeederService implements OnModuleInit {
           const savedLabel = await this.labelRepository.save(newLabel);
           createdLabels.push(savedLabel);
         }
-        this.logger.log(`✅ Created ${labelNames.length} labels for user ${user.email}`);
+        this.logger.log(
+          `✅ Created ${labelNames.length} labels for user ${user.email}`,
+        );
       }
       return createdLabels;
     } catch (error) {
@@ -404,7 +418,10 @@ export class SeederService implements OnModuleInit {
     }
   }
 
-  private async seedPublicsForce(users: User[], numbers: Number[]): Promise<Publics[]> {
+  private async seedPublicsForce(
+    users: User[],
+    numbers: Number[],
+  ): Promise<Publics[]> {
     try {
       if (users.length === 0) {
         this.logger.log('👥 No users to create publics for, skipping.');
@@ -437,7 +454,9 @@ export class SeederService implements OnModuleInit {
           const savedPublic = await this.publicsRepository.save(newPublic);
           createdPublics.push(savedPublic);
         }
-        this.logger.log(`✅ Created ${publicNames.length} publics for user ${user.email}`);
+        this.logger.log(
+          `✅ Created ${publicNames.length} publics for user ${user.email}`,
+        );
       }
       return createdPublics;
     } catch (error) {
@@ -446,7 +465,11 @@ export class SeederService implements OnModuleInit {
     }
   }
 
-  private async seedContactsForce(users: User[], numbers: Number[], publics: Publics[]): Promise<Contact[]> {
+  private async seedContactsForce(
+    users: User[],
+    numbers: Number[],
+    publics: Publics[],
+  ): Promise<Contact[]> {
     try {
       if (users.length === 0) {
         this.logger.log('📇 No users to create contacts for, skipping.');
@@ -469,7 +492,9 @@ export class SeederService implements OnModuleInit {
       const createdContacts: Contact[] = [];
       for (const user of users) {
         const userNumber = numbers.find((n) => n.user_id === user.id);
-        const userPublic = publics.find((p) => p.user_id === user.id && p.name === 'Todos os Contatos');
+        const userPublic = publics.find(
+          (p) => p.user_id === user.id && p.name === 'Todos os Contatos',
+        );
         const celOwner = userNumber?.cel || '';
 
         for (const [index, contactData] of contactsData.entries()) {
@@ -482,14 +507,17 @@ export class SeederService implements OnModuleInit {
             cel_owner: celOwner,
             status: 1,
             type: 1,
-            labelsName: index < 3 ? 'Cliente VIP' : index < 6 ? 'Lead Quente' : 'Novo',
+            labelsName:
+              index < 3 ? 'Cliente VIP' : index < 6 ? 'Lead Quente' : 'Novo',
           };
 
           const newContact = this.contactRepository.create(contact);
           const savedContact = await this.contactRepository.save(newContact);
           createdContacts.push(savedContact);
         }
-        this.logger.log(`✅ Created ${contactsData.length} contacts for user ${user.email}`);
+        this.logger.log(
+          `✅ Created ${contactsData.length} contacts for user ${user.email}`,
+        );
       }
       return createdContacts;
     } catch (error) {
@@ -703,7 +731,10 @@ export class SeederService implements OnModuleInit {
   }
 
   // ==================== NUMBERS (WhatsApp Instances) ====================
-  private async seedNumbers(users: User[], servers: Server[]): Promise<Number[]> {
+  private async seedNumbers(
+    users: User[],
+    servers: Server[],
+  ): Promise<Number[]> {
     try {
       const existingNumbers = await this.numberRepository.find();
       if (existingNumbers.length > 0) {
@@ -739,7 +770,9 @@ export class SeederService implements OnModuleInit {
         const newNumber = this.numberRepository.create(numberData);
         const savedNumber = await this.numberRepository.save(newNumber);
         createdNumbers.push(savedNumber);
-        this.logger.log(`✅ Created number for user ${user.email}: ${savedNumber.cel}`);
+        this.logger.log(
+          `✅ Created number for user ${user.email}: ${savedNumber.cel}`,
+        );
       }
       return createdNumbers;
     } catch (error) {
@@ -753,7 +786,9 @@ export class SeederService implements OnModuleInit {
     try {
       const existingConfigs = await this.configurationRepository.find();
       if (existingConfigs.length > 0) {
-        this.logger.log('🔧 Configurations table is not empty, skipping seeding.');
+        this.logger.log(
+          '🔧 Configurations table is not empty, skipping seeding.',
+        );
         return existingConfigs;
       }
 
@@ -782,15 +817,20 @@ export class SeederService implements OnModuleInit {
   }
 
   // ==================== MESSAGE TEMPLATES ====================
-  private async seedMessageTemplates(users: User[]): Promise<MessageTemplate[]> {
+  private async seedMessageTemplates(
+    users: User[],
+  ): Promise<MessageTemplate[]> {
     try {
       const existingTemplates = await this.messageTemplateRepository.find();
       if (existingTemplates.length > 0) {
-        this.logger.log('📝 Message templates table is not empty, skipping seeding.');
+        this.logger.log(
+          '📝 Message templates table is not empty, skipping seeding.',
+        );
         return existingTemplates;
       }
 
-      const adminUser = users.find((u) => u.profile === UserProfile.ADMINISTRATOR) || users[0];
+      const adminUser =
+        users.find((u) => u.profile === UserProfile.ADMINISTRATOR) || users[0];
       if (!adminUser) {
         this.logger.log('📝 No admin user to create templates for, skipping.');
         return [];
@@ -800,7 +840,8 @@ export class SeederService implements OnModuleInit {
         {
           user_id: adminUser.id,
           name: 'Boas-vindas',
-          message: 'Olá {{nome}}! Seja bem-vindo(a) à nossa comunidade. Estamos felizes em ter você conosco!',
+          message:
+            'Olá {{nome}}! Seja bem-vindo(a) à nossa comunidade. Estamos felizes em ter você conosco!',
           category: 'boas-vindas',
           status: 1,
           active: 1,
@@ -809,7 +850,8 @@ export class SeederService implements OnModuleInit {
         {
           user_id: adminUser.id,
           name: 'Promoção',
-          message: 'Olá {{nome}}! Temos uma promoção especial para você: {{desconto}}% de desconto em todos os produtos. Aproveite!',
+          message:
+            'Olá {{nome}}! Temos uma promoção especial para você: {{desconto}}% de desconto em todos os produtos. Aproveite!',
           category: 'marketing',
           status: 1,
           active: 1,
@@ -818,7 +860,8 @@ export class SeederService implements OnModuleInit {
         {
           user_id: adminUser.id,
           name: 'Lembrete',
-          message: 'Olá {{nome}}! Este é um lembrete sobre {{assunto}}. Não esqueça!',
+          message:
+            'Olá {{nome}}! Este é um lembrete sobre {{assunto}}. Não esqueça!',
           category: 'lembrete',
           status: 1,
           active: 1,
@@ -827,7 +870,8 @@ export class SeederService implements OnModuleInit {
         {
           user_id: adminUser.id,
           name: 'Agradecimento',
-          message: 'Olá {{nome}}! Muito obrigado pela sua compra. Seu pedido #{{pedido}} está sendo processado.',
+          message:
+            'Olá {{nome}}! Muito obrigado pela sua compra. Seu pedido #{{pedido}} está sendo processado.',
           category: 'pos-venda',
           status: 1,
           active: 1,
@@ -836,7 +880,8 @@ export class SeederService implements OnModuleInit {
         {
           user_id: adminUser.id,
           name: 'Aniversário',
-          message: 'Feliz Aniversário, {{nome}}! Que seu dia seja repleto de alegrias!',
+          message:
+            'Feliz Aniversário, {{nome}}! Que seu dia seja repleto de alegrias!',
           category: 'especial',
           status: 1,
           active: 1,
@@ -847,7 +892,8 @@ export class SeederService implements OnModuleInit {
       const createdTemplates: MessageTemplate[] = [];
       for (const templateData of templatesToCreate) {
         const newTemplate = this.messageTemplateRepository.create(templateData);
-        const savedTemplate = await this.messageTemplateRepository.save(newTemplate);
+        const savedTemplate =
+          await this.messageTemplateRepository.save(newTemplate);
         createdTemplates.push(savedTemplate);
         this.logger.log(`✅ Created template: ${savedTemplate.name}`);
       }
@@ -899,7 +945,9 @@ export class SeederService implements OnModuleInit {
           const savedLabel = await this.labelRepository.save(newLabel);
           createdLabels.push(savedLabel);
         }
-        this.logger.log(`✅ Created ${labelNames.length} labels for user ${user.email}`);
+        this.logger.log(
+          `✅ Created ${labelNames.length} labels for user ${user.email}`,
+        );
       }
       return createdLabels;
     } catch (error) {
@@ -909,7 +957,10 @@ export class SeederService implements OnModuleInit {
   }
 
   // ==================== PUBLICS (Contact Groups) ====================
-  private async seedPublics(users: User[], numbers: Number[]): Promise<Publics[]> {
+  private async seedPublics(
+    users: User[],
+    numbers: Number[],
+  ): Promise<Publics[]> {
     try {
       const existingPublics = await this.publicsRepository.find();
       if (existingPublics.length > 0) {
@@ -948,7 +999,9 @@ export class SeederService implements OnModuleInit {
           const savedPublic = await this.publicsRepository.save(newPublic);
           createdPublics.push(savedPublic);
         }
-        this.logger.log(`✅ Created ${publicNames.length} publics for user ${user.email}`);
+        this.logger.log(
+          `✅ Created ${publicNames.length} publics for user ${user.email}`,
+        );
       }
       return createdPublics;
     } catch (error) {
@@ -958,7 +1011,11 @@ export class SeederService implements OnModuleInit {
   }
 
   // ==================== CONTACTS ====================
-  private async seedContacts(users: User[], numbers: Number[], publics: Publics[]): Promise<Contact[]> {
+  private async seedContacts(
+    users: User[],
+    numbers: Number[],
+    publics: Publics[],
+  ): Promise<Contact[]> {
     try {
       const existingContacts = await this.contactRepository.find();
       if (existingContacts.length > 0) {
@@ -987,7 +1044,9 @@ export class SeederService implements OnModuleInit {
       const createdContacts: Contact[] = [];
       for (const user of users) {
         const userNumber = numbers.find((n) => n.user_id === user.id);
-        const userPublic = publics.find((p) => p.user_id === user.id && p.name === 'Todos os Contatos');
+        const userPublic = publics.find(
+          (p) => p.user_id === user.id && p.name === 'Todos os Contatos',
+        );
         const celOwner = userNumber?.cel || '';
 
         for (const [index, contactData] of contactsData.entries()) {
@@ -1000,14 +1059,17 @@ export class SeederService implements OnModuleInit {
             cel_owner: celOwner,
             status: 1,
             type: 1,
-            labelsName: index < 3 ? 'Cliente VIP' : index < 6 ? 'Lead Quente' : 'Novo',
+            labelsName:
+              index < 3 ? 'Cliente VIP' : index < 6 ? 'Lead Quente' : 'Novo',
           };
 
           const newContact = this.contactRepository.create(contact);
           const savedContact = await this.contactRepository.save(newContact);
           createdContacts.push(savedContact);
         }
-        this.logger.log(`✅ Created ${contactsData.length} contacts for user ${user.email}`);
+        this.logger.log(
+          `✅ Created ${contactsData.length} contacts for user ${user.email}`,
+        );
       }
       return createdContacts;
     } catch (error) {

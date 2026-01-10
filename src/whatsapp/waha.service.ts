@@ -74,7 +74,12 @@ export class WahaService {
       };
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao buscar QR Code: ${session}`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -100,7 +105,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao verificar status da sessão: ${session}`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -121,7 +131,12 @@ export class WahaService {
       return true;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao iniciar sessão: ${session}`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -140,7 +155,12 @@ export class WahaService {
       return true;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao parar sessão: ${session}`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -159,7 +179,12 @@ export class WahaService {
       return true;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao desconectar sessão: ${session}`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -185,7 +210,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao enviar mensagem de texto`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -215,7 +245,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao enviar enquete`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -234,7 +269,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao buscar configurações`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -259,7 +299,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao atualizar configurações`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -287,7 +332,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao enviar imagem`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -313,7 +363,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao enviar áudio`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -341,7 +396,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao enviar vídeo`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -368,7 +428,12 @@ export class WahaService {
       return response.data;
     } catch (error: unknown) {
       this.logger.error(`❌ Erro ao verificar número`, {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }

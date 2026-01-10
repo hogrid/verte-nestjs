@@ -24,17 +24,23 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
   readonly providerVersion = '2.0.0';
 
   constructor(private readonly configService: ConfigService) {
-    this.baseUrl = this.configService.get<string>('EVOLUTION_API_URL') || 'http://localhost:8080';
+    this.baseUrl =
+      this.configService.get<string>('EVOLUTION_API_URL') ||
+      'http://localhost:8080';
     this.apiKey = this.configService.get<string>('EVOLUTION_API_KEY') || '';
   }
 
-  private async request<T>(method: string, endpoint: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: string,
+    endpoint: string,
+    body?: unknown,
+  ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
     const options: RequestInit = {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'apikey': this.apiKey,
+        apikey: this.apiKey,
       },
     };
 
@@ -47,7 +53,9 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || `Request failed with status ${response.status}`);
+        throw new Error(
+          data.message || `Request failed with status ${response.status}`,
+        );
       }
 
       return data as T;
@@ -61,25 +69,27 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     const instanceName = options.instanceName || `instance_${Date.now()}`;
 
     try {
-      const response = await this.request<{ instance: { instanceName: string; status: string }; qrcode?: { base64?: string; pairingCode?: string } }>(
-        'POST',
-        '/instance/create',
-        {
-          instanceName,
-          qrcode: options.qrcode ?? true,
-          integration: 'WHATSAPP-BAILEYS',
-        }
-      );
+      const response = await this.request<{
+        instance: { instanceName: string; status: string };
+        qrcode?: { base64?: string; pairingCode?: string };
+      }>('POST', '/instance/create', {
+        instanceName,
+        qrcode: options.qrcode ?? true,
+        integration: 'WHATSAPP-BAILEYS',
+      });
 
       return {
         instanceName: response.instance?.instanceName || instanceName,
-        status: response.instance?.status === 'open' ? 'connected' : 'disconnected',
+        status:
+          response.instance?.status === 'open' ? 'connected' : 'disconnected',
         qrCode: response.qrcode?.base64,
         pairingCode: response.qrcode?.pairingCode,
       };
     } catch (error) {
       // Instance may already exist, try to get its status
-      this.logger.warn(`Create instance failed, checking if exists: ${instanceName}`);
+      this.logger.warn(
+        `Create instance failed, checking if exists: ${instanceName}`,
+      );
       const status = await this.getInstanceStatus(instanceName);
       return {
         instanceName,
@@ -94,10 +104,11 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
   }
 
   async connectInstance(instanceName: string): Promise<QrCodeResponse> {
-    const response = await this.request<{ base64?: string; code?: string; pairingCode?: string }>(
-      'GET',
-      `/instance/connect/${instanceName}`
-    );
+    const response = await this.request<{
+      base64?: string;
+      code?: string;
+      pairingCode?: string;
+    }>('GET', `/instance/connect/${instanceName}`);
 
     return {
       qrcode: response.base64,
@@ -127,10 +138,9 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
 
   async getInstanceStatus(instanceName: string): Promise<InstanceStatus> {
     try {
-      const response = await this.request<{ instance: { state: string; status?: string } }>(
-        'GET',
-        `/instance/connectionState/${instanceName}`
-      );
+      const response = await this.request<{
+        instance: { state: string; status?: string };
+      }>('GET', `/instance/connectionState/${instanceName}`);
 
       const state = response.instance?.state || 'unknown';
       const isConnected = state === 'open';
@@ -153,15 +163,21 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
 
   async getAllInstances(): Promise<InstanceStatus[]> {
     try {
-      const response = await this.request<Array<{ instance: { instanceName: string; state: string } }>>(
-        'GET',
-        '/instance/fetchInstances'
-      );
+      const response = await this.request<
+        Array<{ instance: { instanceName: string; state: string } }>
+      >('GET', '/instance/fetchInstances');
 
       return response.map((item) => ({
         instanceName: item.instance?.instanceName || 'unknown',
-        state: (item.instance?.state || 'unknown') as 'open' | 'close' | 'connecting' | 'unknown',
-        status: item.instance?.state === 'open' ? 'connected' : 'disconnected' as const,
+        state: (item.instance?.state || 'unknown') as
+          | 'open'
+          | 'close'
+          | 'connecting'
+          | 'unknown',
+        status:
+          item.instance?.state === 'open'
+            ? 'connected'
+            : ('disconnected' as const),
         connected: item.instance?.state === 'open',
       }));
     } catch {
@@ -173,15 +189,17 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     return this.connectInstance(instanceName);
   }
 
-  async sendText(instanceName: string, options: SendTextOptions): Promise<SendMessageResponse> {
-    const response = await this.request<{ key?: { id?: string }; status?: string }>(
-      'POST',
-      `/message/sendText/${instanceName}`,
-      {
-        number: options.to,
-        text: options.text,
-      }
-    );
+  async sendText(
+    instanceName: string,
+    options: SendTextOptions,
+  ): Promise<SendMessageResponse> {
+    const response = await this.request<{
+      key?: { id?: string };
+      status?: string;
+    }>('POST', `/message/sendText/${instanceName}`, {
+      number: options.to,
+      text: options.text,
+    });
 
     return {
       messageId: response.key?.id,
@@ -189,20 +207,22 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     };
   }
 
-  async sendMedia(instanceName: string, options: SendMediaOptions): Promise<SendMessageResponse> {
+  async sendMedia(
+    instanceName: string,
+    options: SendMediaOptions,
+  ): Promise<SendMessageResponse> {
     const endpoint = `/message/sendMedia/${instanceName}`;
 
-    const response = await this.request<{ key?: { id?: string }; status?: string }>(
-      'POST',
-      endpoint,
-      {
-        number: options.to,
-        mediatype: options.mediaType,
-        media: options.mediaUrl,
-        caption: options.caption,
-        fileName: options.fileName,
-      }
-    );
+    const response = await this.request<{
+      key?: { id?: string };
+      status?: string;
+    }>('POST', endpoint, {
+      number: options.to,
+      mediatype: options.mediaType,
+      media: options.mediaUrl,
+      caption: options.caption,
+      fileName: options.fileName,
+    });
 
     return {
       messageId: response.key?.id,
@@ -210,7 +230,10 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     };
   }
 
-  async sendTemplate(instanceName: string, options: SendTemplateOptions): Promise<SendMessageResponse> {
+  async sendTemplate(
+    instanceName: string,
+    options: SendTemplateOptions,
+  ): Promise<SendMessageResponse> {
     // Evolution API doesn't natively support templates, send as text
     return this.sendText(instanceName, {
       to: options.to,
@@ -219,24 +242,66 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
   }
 
   // Legacy methods for compatibility
-  async sendTextMessage(instanceName: string, phone: string, message: string): Promise<SendMessageResponse> {
+  async sendTextMessage(
+    instanceName: string,
+    phone: string,
+    message: string,
+  ): Promise<SendMessageResponse> {
     return this.sendText(instanceName, { to: phone, text: message });
   }
 
-  async sendImageMessage(instanceName: string, phone: string, imageUrl: string, caption?: string): Promise<SendMessageResponse> {
-    return this.sendMedia(instanceName, { to: phone, mediaUrl: imageUrl, mediaType: 'image', caption });
+  async sendImageMessage(
+    instanceName: string,
+    phone: string,
+    imageUrl: string,
+    caption?: string,
+  ): Promise<SendMessageResponse> {
+    return this.sendMedia(instanceName, {
+      to: phone,
+      mediaUrl: imageUrl,
+      mediaType: 'image',
+      caption,
+    });
   }
 
-  async sendVideoMessage(instanceName: string, phone: string, videoUrl: string, caption?: string): Promise<SendMessageResponse> {
-    return this.sendMedia(instanceName, { to: phone, mediaUrl: videoUrl, mediaType: 'video', caption });
+  async sendVideoMessage(
+    instanceName: string,
+    phone: string,
+    videoUrl: string,
+    caption?: string,
+  ): Promise<SendMessageResponse> {
+    return this.sendMedia(instanceName, {
+      to: phone,
+      mediaUrl: videoUrl,
+      mediaType: 'video',
+      caption,
+    });
   }
 
-  async sendAudioMessage(instanceName: string, phone: string, audioUrl: string): Promise<SendMessageResponse> {
-    return this.sendMedia(instanceName, { to: phone, mediaUrl: audioUrl, mediaType: 'audio' });
+  async sendAudioMessage(
+    instanceName: string,
+    phone: string,
+    audioUrl: string,
+  ): Promise<SendMessageResponse> {
+    return this.sendMedia(instanceName, {
+      to: phone,
+      mediaUrl: audioUrl,
+      mediaType: 'audio',
+    });
   }
 
-  async sendDocumentMessage(instanceName: string, phone: string, documentUrl: string, fileName?: string): Promise<SendMessageResponse> {
-    return this.sendMedia(instanceName, { to: phone, mediaUrl: documentUrl, mediaType: 'document', fileName });
+  async sendDocumentMessage(
+    instanceName: string,
+    phone: string,
+    documentUrl: string,
+    fileName?: string,
+  ): Promise<SendMessageResponse> {
+    return this.sendMedia(instanceName, {
+      to: phone,
+      mediaUrl: documentUrl,
+      mediaType: 'document',
+      fileName,
+    });
   }
 
   async sendMediaMessage(
@@ -247,15 +312,24 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     caption?: string,
     fileName?: string,
   ): Promise<SendMessageResponse> {
-    return this.sendMedia(instanceName, { to: phone, mediaUrl, mediaType, caption, fileName });
+    return this.sendMedia(instanceName, {
+      to: phone,
+      mediaUrl,
+      mediaType,
+      caption,
+      fileName,
+    });
   }
 
-  async getProfilePicture(instanceName: string, phone: string): Promise<string | null> {
+  async getProfilePicture(
+    instanceName: string,
+    phone: string,
+  ): Promise<string | null> {
     try {
       const response = await this.request<{ profilePictureUrl?: string }>(
         'POST',
         `/chat/fetchProfilePictureUrl/${instanceName}`,
-        { number: phone }
+        { number: phone },
       );
       return response.profilePictureUrl || null;
     } catch {
@@ -263,12 +337,15 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     }
   }
 
-  async getProfileStatus(instanceName: string, phone: string): Promise<string | null> {
+  async getProfileStatus(
+    instanceName: string,
+    phone: string,
+  ): Promise<string | null> {
     try {
       const response = await this.request<{ status?: string }>(
         'POST',
         `/chat/fetchStatus/${instanceName}`,
-        { number: phone }
+        { number: phone },
       );
       return response.status || null;
     } catch {
@@ -276,7 +353,10 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     }
   }
 
-  async setProfilePicture(instanceName: string, imageUrl: string): Promise<void> {
+  async setProfilePicture(
+    instanceName: string,
+    imageUrl: string,
+  ): Promise<void> {
     await this.request('POST', `/instance/setProfilePicture/${instanceName}`, {
       picture: imageUrl,
     });
@@ -288,13 +368,13 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     });
   }
 
-  async getContacts(instanceName: string): Promise<Array<{ phone: string; name?: string; profilePicture?: string }>> {
+  async getContacts(
+    instanceName: string,
+  ): Promise<Array<{ phone: string; name?: string; profilePicture?: string }>> {
     try {
-      const response = await this.request<Array<{ id: string; pushName?: string; profilePictureUrl?: string }>>(
-        'POST',
-        `/chat/fetchContacts/${instanceName}`,
-        {}
-      );
+      const response = await this.request<
+        Array<{ id: string; pushName?: string; profilePictureUrl?: string }>
+      >('POST', `/chat/fetchContacts/${instanceName}`, {});
 
       return response.map((contact) => ({
         phone: contact.id?.replace('@s.whatsapp.net', '') || '',
@@ -306,12 +386,15 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
     }
   }
 
-  async checkNumberExists(instanceName: string, phone: string): Promise<boolean> {
+  async checkNumberExists(
+    instanceName: string,
+    phone: string,
+  ): Promise<boolean> {
     try {
       const response = await this.request<{ exists: boolean }>(
         'POST',
         `/chat/whatsappNumbers/${instanceName}`,
-        { numbers: [phone] }
+        { numbers: [phone] },
       );
       return response.exists ?? false;
     } catch {
@@ -354,7 +437,8 @@ export class EvolutionApiProvider implements IWhatsAppProvider {
       return {
         type: 'qrcode',
         data: {
-          base64: typeof qrcodeData === 'object' ? qrcodeData?.base64 : qrcodeData,
+          base64:
+            typeof qrcodeData === 'object' ? qrcodeData?.base64 : qrcodeData,
           pairingCode: data.pairingCode,
           instanceName: payload.instance,
         },

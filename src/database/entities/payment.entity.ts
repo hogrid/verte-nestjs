@@ -39,7 +39,12 @@ export class Payment {
   @Column({ type: 'float', precision: 8, scale: 2, default: 0 })
   amount: number;
 
-  @Column({ name: 'extra_number', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'extra_number',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   extra_number: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

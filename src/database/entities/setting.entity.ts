@@ -27,7 +27,14 @@ export class Setting {
   @Column({ name: 'timer_fast', type: 'int', nullable: true })
   timer_fast: number | null;
 
-  @Column({ name: 'number_value', type: 'float', precision: 8, scale: 2, nullable: true, default: 0 })
+  @Column({
+    name: 'number_value',
+    type: 'float',
+    precision: 8,
+    scale: 2,
+    nullable: true,
+    default: 0,
+  })
   number_value: number | null;
 
   @Column({ name: 'limit_campaign', type: 'int', nullable: true })

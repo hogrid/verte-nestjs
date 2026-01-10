@@ -1,4 +1,10 @@
-import { IsOptional, IsNumber, IsString, IsArray, IsBoolean } from 'class-validator';
+import {
+  IsOptional,
+  IsNumber,
+  IsString,
+  IsArray,
+  IsBoolean,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ImportCsvDto {

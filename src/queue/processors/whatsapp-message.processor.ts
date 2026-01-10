@@ -47,21 +47,28 @@ export class WhatsappMessageProcessor {
 
   @OnQueueActive()
   onActive(job: Job<WhatsAppMessageJob>) {
-    this.logger.log(`📌 [MSG-QUEUE] Job ${job.id} ativado - Phone: ${job.data.phone?.substring(0, 8)}***`);
+    this.logger.log(
+      `📌 [MSG-QUEUE] Job ${job.id} ativado - Phone: ${job.data.phone?.substring(0, 8)}***`,
+    );
   }
 
   @OnQueueCompleted()
   onCompleted(job: Job<WhatsAppMessageJob>) {
-    this.logger.log(`✅ [MSG-QUEUE] Job ${job.id} completado - Campanha #${job.data.campaignId}`);
+    this.logger.log(
+      `✅ [MSG-QUEUE] Job ${job.id} completado - Campanha #${job.data.campaignId}`,
+    );
   }
 
   @OnQueueFailed()
   onFailed(job: Job<WhatsAppMessageJob>, error: Error) {
-    this.logger.error(`❌ [MSG-QUEUE] Job ${job.id} falhou - Campanha #${job.data.campaignId}`, {
-      error: error.message,
-      phone: job.data.phone?.substring(0, 8) + '***',
-      attempts: job.attemptsMade,
-    });
+    this.logger.error(
+      `❌ [MSG-QUEUE] Job ${job.id} falhou - Campanha #${job.data.campaignId}`,
+      {
+        error: error.message,
+        phone: job.data.phone?.substring(0, 8) + '***',
+        attempts: job.attemptsMade,
+      },
+    );
   }
 
   @OnQueueStalled()
@@ -78,8 +85,17 @@ export class WhatsappMessageProcessor {
 
   @Process('send-message')
   async handleMessage(job: Job<WhatsAppMessageJob>) {
-    const { messageByContactId, messageId, campaignId, instanceName, phone, text, mediaUrl, mediaType, caption } =
-      job.data;
+    const {
+      messageByContactId,
+      messageId,
+      campaignId,
+      instanceName,
+      phone,
+      text,
+      mediaUrl,
+      mediaType,
+      caption,
+    } = job.data;
 
     this.logger.log(`📤 Enviando mensagem`, {
       jobId: job.id,
@@ -120,7 +136,11 @@ export class WhatsappMessageProcessor {
       }
 
       // Incrementar contador de mensagens enviadas na campanha
-      await this.campaignRepository.increment({ id: campaignId }, 'total_sent', 1);
+      await this.campaignRepository.increment(
+        { id: campaignId },
+        'total_sent',
+        1,
+      );
 
       // Verificar se campanha foi completada
       await this.checkCampaignCompletion(campaignId);
@@ -133,7 +153,8 @@ export class WhatsappMessageProcessor {
 
       return result;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
 
       this.logger.error(`❌ Falha ao enviar mensagem`, {
         jobId: job.id,
@@ -191,7 +212,10 @@ export class WhatsappMessageProcessor {
       });
     } else if (totalExpected > 0) {
       // Atualizar progresso baseado no total esperado
-      const progress = Math.min(100, Math.round((totalSent / totalExpected) * 100));
+      const progress = Math.min(
+        100,
+        Math.round((totalSent / totalExpected) * 100),
+      );
       await this.campaignRepository.update(campaignId, { progress });
     }
   }

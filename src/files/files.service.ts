@@ -107,7 +107,12 @@ export class FilesService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Error uploading media file', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
 
       // Clean up uploaded file on error
@@ -218,7 +223,12 @@ export class FilesService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Error downloading file', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -263,7 +273,12 @@ export class FilesService {
       this.logger.log('✅ Media file deleted', { fileId });
     } catch (error: unknown) {
       this.logger.error('❌ Error deleting media file', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }

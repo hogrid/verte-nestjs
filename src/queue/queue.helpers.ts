@@ -18,7 +18,10 @@ export function getErrorStack(error: unknown): string {
   if (isErrorWithStack(error)) {
     return error.stack || error.message;
   }
-  return String(error);
+  if (typeof error === 'string') {
+    return error;
+  }
+  return JSON.stringify(error);
 }
 
 /**
@@ -28,5 +31,8 @@ export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
-  return String(error);
+  if (typeof error === 'string') {
+    return error;
+  }
+  return JSON.stringify(error);
 }

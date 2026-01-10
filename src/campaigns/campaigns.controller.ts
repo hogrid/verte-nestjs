@@ -52,7 +52,7 @@ function parseFormDataFields(body: Record<string, any>): Record<string, any> {
 
   for (const [key, value] of Object.entries(body)) {
     // Parse nested keys like 'messages[0][text]' or 'tags[0]'
-    const parts = key.match(/([^\[\]]+)/g);
+    const parts = key.match(/([^[\]]+)/g);
     if (!parts) continue;
 
     let current: any = result;
@@ -1234,7 +1234,11 @@ Altera o status de uma campanha específica.
   async changeStatus(@Request() req: any, @Body() dto: ChangeStatusDto) {
     // Accept both campaign_id and id (frontend sends 'id')
     const campaignId = dto.campaign_id || dto.id;
-    return this.campaignsService.changeStatus(req.user.id, campaignId, dto.status);
+    return this.campaignsService.changeStatus(
+      req.user.id,
+      campaignId,
+      dto.status,
+    );
   }
 
   /**

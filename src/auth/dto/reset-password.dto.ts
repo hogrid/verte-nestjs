@@ -13,11 +13,15 @@ export class ResetPasswordDto {
   email: string;
 
   @IsString({ message: 'O campo password deve ser uma string.' })
-  @MinLength(6, { message: 'O campo password deve ter no mínimo 6 caracteres.' })
+  @MinLength(6, {
+    message: 'O campo password deve ter no mínimo 6 caracteres.',
+  })
   password: string;
 
   @IsString({ message: 'O campo password_confirmation deve ser uma string.' })
-  @MinLength(6, { message: 'O campo password_confirmation deve ter no mínimo 6 caracteres.' })
+  @MinLength(6, {
+    message: 'O campo password_confirmation deve ter no mínimo 6 caracteres.',
+  })
   password_confirmation: string;
 }
 
@@ -26,10 +30,14 @@ export class ChangePasswordDto {
   current_password: string;
 
   @IsString({ message: 'O campo password deve ser uma string.' })
-  @MinLength(6, { message: 'O campo password deve ter no mínimo 6 caracteres.' })
+  @MinLength(6, {
+    message: 'O campo password deve ter no mínimo 6 caracteres.',
+  })
   password: string;
 
   @IsString({ message: 'O campo password_confirmation deve ser uma string.' })
-  @MinLength(6, { message: 'O campo password_confirmation deve ter no mínimo 6 caracteres.' })
+  @MinLength(6, {
+    message: 'O campo password_confirmation deve ter no mínimo 6 caracteres.',
+  })
   password_confirmation: string;
 }

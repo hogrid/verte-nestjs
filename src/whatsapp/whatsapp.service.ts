@@ -90,7 +90,7 @@ export class WhatsappService {
                 number.status_connection === 1 ? 'connected' : 'disconnected',
             });
           }
-        } catch (error) {
+        } catch {
           // ignore error during initial status check
         }
       })();
@@ -102,7 +102,7 @@ export class WhatsappService {
               where: { instance: payload.instanceName },
             });
             if (number?.user_id === userId) subscriber.next(payload);
-          } catch (error) {
+          } catch {
             // ignore error during status update
           }
         })();
@@ -217,7 +217,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao configurar WhatsApp', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
 
       throw new BadRequestException(
@@ -342,7 +342,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao obter QR Code', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -377,8 +377,8 @@ export class WhatsappService {
         number.instance,
       );
 
-      let connected = instanceInfo.status === 'connected';
-      let status = instanceInfo.status;
+      const connected = instanceInfo.status === 'connected';
+      const status = instanceInfo.status;
       let phone = instanceInfo.phoneNumber;
       let profile = instanceInfo.profileName;
 
@@ -401,10 +401,15 @@ export class WhatsappService {
             phone = row.ownerJid.replace(/@.*/, '');
           }
           profile = row.profileName || profile;
-          this.logger.log(`📱 Dados do Evolution: phone=${phone}, profile=${profile}`);
+          this.logger.log(
+            `📱 Dados do Evolution: phone=${phone}, profile=${profile}`,
+          );
         }
       } catch (error) {
-        this.logger.warn('⚠️ Erro ao buscar dados do Evolution Postgres:', error);
+        this.logger.warn(
+          '⚠️ Erro ao buscar dados do Evolution Postgres:',
+          error,
+        );
       }
 
       const connectionStatus = connected ? 1 : 0;
@@ -434,7 +439,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao verificar conexão', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
 
       return {
@@ -485,7 +490,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao enviar mensagem', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -546,7 +551,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao enviar template', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -595,7 +600,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao enviar imagem', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -627,7 +632,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao listar números', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -663,7 +668,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao buscar número', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -707,7 +712,7 @@ export class WhatsappService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao remover número', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -741,7 +746,7 @@ export class WhatsappService {
                     .catch(() => undefined);
                 } catch (error) {
                   this.logger.warn(
-                    `Erro ao disparar sync de contatos: ${error instanceof Error ? error.message : String(error)}`,
+                    `Erro ao disparar sync de contatos: ${error instanceof Error ? error.message : 'Unknown error'}`,
                   );
                 }
               }
@@ -781,7 +786,7 @@ export class WhatsappService {
       return { success: false, message: 'Estrutura de webhook inválida' };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar webhook', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       return {
         success: false,
@@ -824,7 +829,7 @@ export class WhatsappService {
       this.logger.log(`✅ QR Code salvo no banco para number_id: ${number.id}`);
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar QR Code event', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
@@ -945,7 +950,7 @@ export class WhatsappService {
       }
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar connection event', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }
@@ -967,7 +972,10 @@ export class WhatsappService {
    * Mantém a instância para possível reconexão futura
    */
   async disconnectByName(instanceName: string, userId: number) {
-    this.logger.log('🔌 Desconectando instância por nome', { instanceName, userId });
+    this.logger.log('🔌 Desconectando instância por nome', {
+      instanceName,
+      userId,
+    });
 
     // Validar propriedade da instância
     const number = await this.numberRepository.findOne({
@@ -975,16 +983,20 @@ export class WhatsappService {
     });
 
     if (!number) {
-      throw new NotFoundException('Instância não encontrada ou não pertence a este usuário');
+      throw new NotFoundException(
+        'Instância não encontrada ou não pertence a este usuário',
+      );
     }
 
     // Desconectar (logout) - mantém instância para reconexão futura
     try {
       await this.whatsappProvider.disconnectInstance(instanceName);
-      this.logger.log(`✅ Instância desconectada via Evolution API: ${instanceName}`);
+      this.logger.log(
+        `✅ Instância desconectada via Evolution API: ${instanceName}`,
+      );
     } catch (error) {
       this.logger.warn(
-        `⚠️ Erro ao desconectar instância no Evolution API: ${error instanceof Error ? error.message : String(error)}`,
+        `⚠️ Erro ao desconectar instância no Evolution API: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
       // Continuar mesmo se erro no Evolution API
       // Apenas atualizamos o banco de dados
@@ -1001,13 +1013,17 @@ export class WhatsappService {
       status: 'disconnected',
     });
 
-    this.logger.log(`✅ Status de desconexão salvo no banco para instância: ${instanceName}`);
+    this.logger.log(
+      `✅ Status de desconexão salvo no banco para instância: ${instanceName}`,
+    );
 
     // Limpar todos os contatos do usuário ao desconectar
     try {
       this.logger.log(`🗑️ Limpando contatos do usuário ${userId}...`);
       const deleteResult = await this.contactsService.removeAll(userId);
-      this.logger.log(`✅ Contatos removidos: ${deleteResult?.data?.deleted || 0}`);
+      this.logger.log(
+        `✅ Contatos removidos: ${deleteResult?.data?.deleted || 0}`,
+      );
     } catch (contactsError) {
       this.logger.warn(
         `⚠️ Erro ao limpar contatos (continuando...): ${contactsError instanceof Error ? contactsError.message : String(contactsError)}`,
@@ -1105,7 +1121,9 @@ export class WhatsappService {
         ).fetchInstances(instanceName);
 
         if (!instanceData) {
-          throw new NotFoundException('Instância não encontrada na Evolution API');
+          throw new NotFoundException(
+            'Instância não encontrada na Evolution API',
+          );
         }
 
         // Mapear resposta da Evolution API para o formato esperado pelo frontend
@@ -1114,7 +1132,8 @@ export class WhatsappService {
           instanceId: instanceData.instanceId || instanceData.id,
           owner: instanceData.owner,
           profileName: instanceData.profileName,
-          profilePictureUrl: instanceData.profilePictureUrl || instanceData.profilePicUrl,
+          profilePictureUrl:
+            instanceData.profilePictureUrl || instanceData.profilePicUrl,
           profileStatus: instanceData.profileStatus,
           status: instanceData.status || instanceData.state,
           integration: instanceData.integration,
@@ -1130,7 +1149,7 @@ export class WhatsappService {
       );
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao buscar dados da instância', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -1204,12 +1223,20 @@ export class WhatsappService {
       if (campaignId && typeof ack === 'number') {
         // ack >= 3: delivered
         if (ack >= 3) {
-          await this.campaignRepository.increment({ id: campaignId }, 'total_delivered', 1);
+          await this.campaignRepository.increment(
+            { id: campaignId },
+            'total_delivered',
+            1,
+          );
           this.logger.debug(`📬 Campanha #${campaignId}: +1 entregue`);
         }
         // ack >= 4: read
         if (ack >= 4) {
-          await this.campaignRepository.increment({ id: campaignId }, 'total_read', 1);
+          await this.campaignRepository.increment(
+            { id: campaignId },
+            'total_read',
+            1,
+          );
           this.logger.debug(`👁️ Campanha #${campaignId}: +1 lido`);
         }
       }

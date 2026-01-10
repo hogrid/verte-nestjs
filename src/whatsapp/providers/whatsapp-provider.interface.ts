@@ -88,16 +88,48 @@ export interface IWhatsAppProvider {
   getQrCode(instanceName: string): Promise<QrCodeResponse>;
 
   // Messaging
-  sendText(instanceName: string, options: SendTextOptions): Promise<SendMessageResponse>;
-  sendMedia(instanceName: string, options: SendMediaOptions): Promise<SendMessageResponse>;
-  sendTemplate?(instanceName: string, options: SendTemplateOptions): Promise<SendMessageResponse>;
+  sendText(
+    instanceName: string,
+    options: SendTextOptions,
+  ): Promise<SendMessageResponse>;
+  sendMedia(
+    instanceName: string,
+    options: SendMediaOptions,
+  ): Promise<SendMessageResponse>;
+  sendTemplate?(
+    instanceName: string,
+    options: SendTemplateOptions,
+  ): Promise<SendMessageResponse>;
 
   // Legacy methods for compatibility
-  sendTextMessage(instanceName: string, phone: string, message: string): Promise<SendMessageResponse>;
-  sendImageMessage(instanceName: string, phone: string, imageUrl: string, caption?: string): Promise<SendMessageResponse>;
-  sendVideoMessage(instanceName: string, phone: string, videoUrl: string, caption?: string): Promise<SendMessageResponse>;
-  sendAudioMessage(instanceName: string, phone: string, audioUrl: string): Promise<SendMessageResponse>;
-  sendDocumentMessage(instanceName: string, phone: string, documentUrl: string, fileName?: string): Promise<SendMessageResponse>;
+  sendTextMessage(
+    instanceName: string,
+    phone: string,
+    message: string,
+  ): Promise<SendMessageResponse>;
+  sendImageMessage(
+    instanceName: string,
+    phone: string,
+    imageUrl: string,
+    caption?: string,
+  ): Promise<SendMessageResponse>;
+  sendVideoMessage(
+    instanceName: string,
+    phone: string,
+    videoUrl: string,
+    caption?: string,
+  ): Promise<SendMessageResponse>;
+  sendAudioMessage(
+    instanceName: string,
+    phone: string,
+    audioUrl: string,
+  ): Promise<SendMessageResponse>;
+  sendDocumentMessage(
+    instanceName: string,
+    phone: string,
+    documentUrl: string,
+    fileName?: string,
+  ): Promise<SendMessageResponse>;
   sendMediaMessage(
     instanceName: string,
     phone: string,
@@ -108,13 +140,18 @@ export interface IWhatsAppProvider {
   ): Promise<SendMessageResponse>;
 
   // Profile
-  getProfilePicture(instanceName: string, phone: string): Promise<string | null>;
+  getProfilePicture(
+    instanceName: string,
+    phone: string,
+  ): Promise<string | null>;
   getProfileStatus(instanceName: string, phone: string): Promise<string | null>;
   setProfilePicture(instanceName: string, imageUrl: string): Promise<void>;
   setProfileStatus(instanceName: string, status: string): Promise<void>;
 
   // Contacts
-  getContacts(instanceName: string): Promise<Array<{ phone: string; name?: string; profilePicture?: string }>>;
+  getContacts(
+    instanceName: string,
+  ): Promise<Array<{ phone: string; name?: string; profilePicture?: string }>>;
   checkNumberExists(instanceName: string, phone: string): Promise<boolean>;
 
   // Webhook

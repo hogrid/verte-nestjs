@@ -133,7 +133,12 @@ export class ScheduleService {
           successCount++;
         } catch (error: unknown) {
           this.logger.error(`❌ Erro ao enfileirar campanha #${campaign.id}`, {
-            error: error instanceof Error ? error.message : String(error),
+            error:
+              error instanceof Error
+                ? error.message
+                : typeof error === 'string'
+                  ? error
+                  : JSON.stringify(error),
           });
           errorCount++;
         }
@@ -146,7 +151,12 @@ export class ScheduleService {
       this.logger.error(
         '❌ [CRON] Erro crítico ao processar campanhas agendadas',
         {
-          error: error instanceof Error ? error.message : String(error),
+          error:
+            error instanceof Error
+              ? error.message
+              : typeof error === 'string'
+                ? error
+                : JSON.stringify(error),
           stack: error instanceof Error ? error.stack : undefined,
         },
       );
@@ -183,7 +193,9 @@ export class ScheduleService {
     this.isSyncingContacts = true;
 
     try {
-      this.logger.log('📱 [CRON] Iniciando sincronização periódica de contatos');
+      this.logger.log(
+        '📱 [CRON] Iniciando sincronização periódica de contatos',
+      );
 
       // Buscar todas as instâncias WhatsApp conectadas
       const connectedNumbers = await this.numberRepository.find({
@@ -194,7 +206,9 @@ export class ScheduleService {
       });
 
       if (connectedNumbers.length === 0) {
-        this.logger.debug('✅ Nenhuma instância WhatsApp conectada para sincronizar');
+        this.logger.debug(
+          '✅ Nenhuma instância WhatsApp conectada para sincronizar',
+        );
         return;
       }
 
@@ -226,7 +240,11 @@ export class ScheduleService {
         } catch (error) {
           this.logger.error(
             `❌ Erro ao sincronizar contatos do user ${number.user_id}:`,
-            error instanceof Error ? error.message : String(error),
+            error instanceof Error
+              ? error.message
+              : typeof error === 'string'
+                ? error
+                : JSON.stringify(error),
           );
           errorCount++;
         }
@@ -238,7 +256,11 @@ export class ScheduleService {
     } catch (error) {
       this.logger.error(
         '❌ [CRON] Erro crítico ao sincronizar contatos',
-        error instanceof Error ? error.message : String(error),
+        error instanceof Error
+          ? error.message
+          : typeof error === 'string'
+            ? error
+            : JSON.stringify(error),
       );
     } finally {
       this.isSyncingContacts = false;

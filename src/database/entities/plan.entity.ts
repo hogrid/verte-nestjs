@@ -49,7 +49,12 @@ export class Plan {
   @Column({ type: 'tinyint', default: 0 })
   popular: number;
 
-  @Column({ name: 'code_product', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'code_product',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   code_product: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

@@ -82,7 +82,9 @@ export class ContactsService {
       return { total: 0, imported: 0 };
     }
 
-    this.logger.log(`✅ Número ativo encontrado: ${numberActive.instance} (cel: ${numberActive.cel})`);
+    this.logger.log(
+      `✅ Número ativo encontrado: ${numberActive.instance} (cel: ${numberActive.cel})`,
+    );
 
     // Se cel não estiver disponível, tentar buscar do Evolution Postgres
     let ownerCel = numberActive.cel;
@@ -103,9 +105,11 @@ export class ContactsService {
           // ownerJid é no formato "5511999999999@s.whatsapp.net"
           ownerCel = row.ownerJid.replace(/@.*/, '');
           // Salvar o cel no banco para uso futuro
-          await this.numberRepository.update(numberActive.id, { cel: ownerCel });
+          await this.numberRepository.update(numberActive.id, {
+            cel: ownerCel,
+          });
         }
-      } catch (error) {
+      } catch {
         // Usar instance name como fallback
         ownerCel = numberActive.instance;
       }
@@ -121,7 +125,9 @@ export class ContactsService {
     const pgUri =
       process.env.EVOLUTION_PG_URI ||
       'postgres://postgres:postgres@localhost:5433/evolution';
-    this.logger.log(`🔗 Conectando ao Evolution Postgres: ${pgUri.replace(/:[^@]+@/, ':****@')}`);
+    this.logger.log(
+      `🔗 Conectando ao Evolution Postgres: ${pgUri.replace(/:[^@]+@/, ':****@')}`,
+    );
 
     const pg = new PgClient({ connectionString: pgUri });
     await pg.connect();
@@ -132,7 +138,9 @@ export class ContactsService {
       );
       const instanceId = instRes.rows?.[0]?.id;
       if (!instanceId) {
-        this.logger.error(`❌ Instância "${numberActive.instance}" não encontrada no Evolution`);
+        this.logger.error(
+          `❌ Instância "${numberActive.instance}" não encontrada no Evolution`,
+        );
         throw new Error('Instância não encontrada no Evolution');
       }
 
@@ -153,7 +161,9 @@ export class ContactsService {
       let filtered = 0;
       const normalizedOwner = NumberHelper.formatNumber(ownerCel) || ownerCel;
 
-      this.logger.log(`🔄 Iniciando loop de importação (batchSize: ${batchSize})`);
+      this.logger.log(
+        `🔄 Iniciando loop de importação (batchSize: ${batchSize})`,
+      );
 
       for (let offset = 0; offset < total; offset += batchSize) {
         const rowsRes = await pg.query(
@@ -161,7 +171,9 @@ export class ContactsService {
           [instanceId, offset, batchSize],
         );
         const batchCount = rowsRes.rows.length;
-        this.logger.log(`📦 Batch ${offset}-${offset + batchCount}: ${batchCount} contatos`);
+        this.logger.log(
+          `📦 Batch ${offset}-${offset + batchCount}: ${batchCount} contatos`,
+        );
 
         for (const r of rowsRes.rows as Array<{
           remoteJid: string;
@@ -216,7 +228,9 @@ export class ContactsService {
 
           // Log a cada 10 contatos importados
           if (imported % 10 === 0) {
-            this.logger.log(`✅ Importados: ${imported} (filtrados: ${filtered}, pulados: ${skipped})`);
+            this.logger.log(
+              `✅ Importados: ${imported} (filtrados: ${filtered}, pulados: ${skipped})`,
+            );
           }
         }
         const progress =
@@ -226,7 +240,9 @@ export class ContactsService {
         this.syncSubject.next({ type: 'progress', total, imported, progress });
       }
 
-      this.logger.log(`🎉 Sincronização finalizada: ${imported} importados, ${skipped} pulados (já existiam), ${filtered} filtrados (inválidos/grupos)`);
+      this.logger.log(
+        `🎉 Sincronização finalizada: ${imported} importados, ${skipped} pulados (já existiam), ${filtered} filtrados (inválidos/grupos)`,
+      );
 
       this.syncSubject.next({
         type: 'complete',
@@ -235,9 +251,14 @@ export class ContactsService {
         progress: 100,
       });
       return { total, imported };
-    } catch (err: any) {
-      this.logger.error(`❌ Erro na sincronização: ${err?.message || err}`, err.stack);
-      this.syncSubject.next({ type: 'error', message: err?.message });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      const errorStack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(
+        `❌ Erro na sincronização: ${errorMessage}`,
+        errorStack,
+      );
+      this.syncSubject.next({ type: 'error', message: errorMessage });
       throw err;
     } finally {
       await pg.end();
@@ -292,7 +313,9 @@ export class ContactsService {
           // ownerJid format: "5511999999999@s.whatsapp.net"
           ownerCel = row.ownerJid.replace(/@.*/, '');
           // Save cel for future use
-          await this.numberRepository.update(numberActive.id, { cel: ownerCel });
+          await this.numberRepository.update(numberActive.id, {
+            cel: ownerCel,
+          });
         }
       } catch {
         // Use instance name as fallback
@@ -473,7 +496,9 @@ export class ContactsService {
       },
     });
 
-    this.logger.log(`🔍 getIndicators para user ${userId}: numberActive=${JSON.stringify(numberActive ? { id: numberActive.id, instance: numberActive.instance, cel: numberActive.cel, status: numberActive.status } : null)}`);
+    this.logger.log(
+      `🔍 getIndicators para user ${userId}: numberActive=${JSON.stringify(numberActive ? { id: numberActive.id, instance: numberActive.instance, cel: numberActive.cel, status: numberActive.status } : null)}`,
+    );
 
     // Return default values if no active WhatsApp number found
     if (!numberActive) {
@@ -505,7 +530,9 @@ export class ContactsService {
         await pg.end();
         if (row?.ownerJid) {
           ownerCel = row.ownerJid.replace(/@.*/, '');
-          await this.numberRepository.update(numberActive.id, { cel: ownerCel });
+          await this.numberRepository.update(numberActive.id, {
+            cel: ownerCel,
+          });
         }
       } catch {
         ownerCel = numberActive.instance;
@@ -526,7 +553,9 @@ export class ContactsService {
     // 3. Normalize cel_owner
     const normalizedCel = NumberHelper.formatNumber(ownerCel) || ownerCel;
 
-    this.logger.log(`📊 getIndicators: ownerCel=${ownerCel}, normalizedCel=${normalizedCel}, numberId=${numberActive.id}`);
+    this.logger.log(
+      `📊 getIndicators: ownerCel=${ownerCel}, normalizedCel=${normalizedCel}, numberId=${numberActive.id}`,
+    );
 
     // DEBUG: Check what values are actually stored in contacts table
     const sampleContacts = await this.contactRepository.find({
@@ -534,13 +563,17 @@ export class ContactsService {
       select: ['id', 'number', 'cel_owner', 'number_id', 'status'],
       take: 5,
     });
-    this.logger.log(`🔍 Sample contacts in DB: ${JSON.stringify(sampleContacts)}`);
+    this.logger.log(
+      `🔍 Sample contacts in DB: ${JSON.stringify(sampleContacts)}`,
+    );
 
     // DEBUG: Count all contacts for this user (without cel_owner filter)
     const totalCountAll = await this.contactRepository.count({
       where: { user_id: userId, deleted_at: IsNull() },
     });
-    this.logger.log(`🔍 Total contacts for user ${userId} (all): ${totalCountAll}`);
+    this.logger.log(
+      `🔍 Total contacts for user ${userId} (all): ${totalCountAll}`,
+    );
 
     // 3. Base query for all metrics
     const baseQuery = this.contactRepository
@@ -581,7 +614,9 @@ export class ContactsService {
       .getRawOne();
     const totalInactive = parseInt(inactiveResult?.count ?? '0', 10) || 0;
 
-    this.logger.log(`✅ getIndicators result: total=${total}, totalActive=${totalActive}, totalBlocked=${totalBlocked}, totalInactive=${totalInactive}`);
+    this.logger.log(
+      `✅ getIndicators result: total=${total}, totalActive=${totalActive}, totalBlocked=${totalBlocked}, totalInactive=${totalInactive}`,
+    );
 
     return {
       data: {
@@ -623,12 +658,16 @@ export class ContactsService {
     this.logger.log(
       `📝 Atualizando ${contactIds.length} contatos para status=${status} (user=${userId})`,
     );
-    this.logger.log(`📋 TODOS os IDs recebidos (${contactIds.length} total): [${contactIds.join(', ')}]`);
+    this.logger.log(
+      `📋 TODOS os IDs recebidos (${contactIds.length} total): [${contactIds.join(', ')}]`,
+    );
 
     // Verificar se há IDs duplicados
     const uniqueIds = [...new Set(contactIds)];
     if (uniqueIds.length !== contactIds.length) {
-      this.logger.warn(`⚠️ DUPLICATAS DETECTADAS! ${contactIds.length} enviados, ${uniqueIds.length} únicos`);
+      this.logger.warn(
+        `⚠️ DUPLICATAS DETECTADAS! ${contactIds.length} enviados, ${uniqueIds.length} únicos`,
+      );
     }
 
     // DEBUG: Verificar quantos contatos existem com esses IDs SEM filtro de user_id
@@ -639,24 +678,36 @@ export class ContactsService {
       select: ['id', 'status', 'deleted_at', 'user_id'],
     });
 
-    this.logger.log(`🔍 DEBUG: ${allContactsWithIds.length} contatos encontrados no banco com esses IDs (sem filtro user_id)`);
+    this.logger.log(
+      `🔍 DEBUG: ${allContactsWithIds.length} contatos encontrados no banco com esses IDs (sem filtro user_id)`,
+    );
 
     // Verificar quantos pertencem ao usuário
-    const belongsToUser = allContactsWithIds.filter(c => c.user_id === userId);
-    const belongsToOthers = allContactsWithIds.filter(c => c.user_id !== userId);
+    const belongsToUser = allContactsWithIds.filter(
+      (c) => c.user_id === userId,
+    );
+    const belongsToOthers = allContactsWithIds.filter(
+      (c) => c.user_id !== userId,
+    );
 
-    this.logger.log(`🔍 DEBUG: ${belongsToUser.length} pertencem ao user=${userId}, ${belongsToOthers.length} pertencem a OUTROS usuários`);
+    this.logger.log(
+      `🔍 DEBUG: ${belongsToUser.length} pertencem ao user=${userId}, ${belongsToOthers.length} pertencem a OUTROS usuários`,
+    );
 
     if (belongsToOthers.length > 0) {
-      const otherUserIds = [...new Set(belongsToOthers.map(c => c.user_id))];
-      this.logger.warn(`⚠️ IDs de outros usuários detectados: ${otherUserIds.join(', ')}`);
+      const otherUserIds = [...new Set(belongsToOthers.map((c) => c.user_id))];
+      this.logger.warn(
+        `⚠️ IDs de outros usuários detectados: ${otherUserIds.join(', ')}`,
+      );
     }
 
-    const alreadyWithStatus = belongsToUser.filter(c => c.status === status);
-    const canBeUpdated = belongsToUser.filter(c => c.status !== status);
-    const deletedOnes = belongsToUser.filter(c => c.deleted_at !== null);
+    const alreadyWithStatus = belongsToUser.filter((c) => c.status === status);
+    const canBeUpdated = belongsToUser.filter((c) => c.status !== status);
+    const deletedOnes = belongsToUser.filter((c) => c.deleted_at !== null);
 
-    this.logger.log(`🔍 DEBUG: ${alreadyWithStatus.length} já têm status=${status}, ${canBeUpdated.length} serão atualizados, ${deletedOnes.length} estão deletados`);
+    this.logger.log(
+      `🔍 DEBUG: ${alreadyWithStatus.length} já têm status=${status}, ${canBeUpdated.length} serão atualizados, ${deletedOnes.length} estão deletados`,
+    );
 
     // SECURITY: Filter by user_id only
     // Os IDs já vêm do frontend que os obteve de uma query filtrada
@@ -671,7 +722,9 @@ export class ContactsService {
       },
     );
 
-    this.logger.log(`✅ ${result.affected} contatos atualizados com sucesso (expected: ${canBeUpdated.length})`);
+    this.logger.log(
+      `✅ ${result.affected} contatos atualizados com sucesso (expected: ${canBeUpdated.length})`,
+    );
 
     // Check if any contacts were updated
     if (result.affected === 0) {

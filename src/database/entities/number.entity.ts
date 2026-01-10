@@ -48,7 +48,12 @@ export class Number {
   @Column({ name: 'chat_sync', type: 'int', nullable: true, default: 0 })
   chat_sync: number | null;
 
-  @Column({ name: 'status_connection', type: 'tinyint', nullable: true, default: 0 })
+  @Column({
+    name: 'status_connection',
+    type: 'tinyint',
+    nullable: true,
+    default: 0,
+  })
   status_connection: number | null;
 
   @Column({ type: 'text', nullable: true })
@@ -63,7 +68,12 @@ export class Number {
   @Column({ name: 'canceled_at', type: 'date', nullable: true })
   canceled_at: Date | null;
 
-  @Column({ name: 'labels_active', type: 'tinyint', nullable: true, default: 0 })
+  @Column({
+    name: 'labels_active',
+    type: 'tinyint',
+    nullable: true,
+    default: 0,
+  })
   labels_active: number | null;
 
   @Column({ name: 'last_sync', type: 'timestamp', nullable: true })

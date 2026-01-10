@@ -33,7 +33,10 @@ export class SimplifiedPublicProcessor {
 
       return { success: true, publicId };
     } catch (error) {
-      this.logger.error(`Failed to process simplified public ${publicId}`, error);
+      this.logger.error(
+        `Failed to process simplified public ${publicId}`,
+        error,
+      );
       throw error;
     }
   }

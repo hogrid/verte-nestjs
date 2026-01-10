@@ -82,7 +82,12 @@ export class WhatsAppCloudService {
       return { messageId };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao enviar mensagem de texto', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
         response: axios.isAxiosError(error) ? error.response?.data : undefined,
       });
       throw error;
@@ -147,7 +152,12 @@ export class WhatsAppCloudService {
       return { messageId };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao enviar template', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
         response: axios.isAxiosError(error) ? error.response?.data : undefined,
       });
       throw error;
@@ -197,7 +207,12 @@ export class WhatsAppCloudService {
       return { messageId };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao enviar imagem', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
         response: axios.isAxiosError(error) ? error.response?.data : undefined,
       });
       throw error;
@@ -250,7 +265,12 @@ export class WhatsAppCloudService {
       return { messageId };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao enviar documento', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
         response: axios.isAxiosError(error) ? error.response?.data : undefined,
       });
       throw error;
@@ -291,7 +311,12 @@ export class WhatsAppCloudService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao buscar informações do número', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
         response: axios.isAxiosError(error) ? error.response?.data : undefined,
       });
       throw error;
@@ -331,7 +356,12 @@ export class WhatsAppCloudService {
       return { success: true };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao marcar mensagem como lida', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
         response: axios.isAxiosError(error) ? error.response?.data : undefined,
       });
       throw error;

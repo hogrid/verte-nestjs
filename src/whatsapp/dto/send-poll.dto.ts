@@ -1,4 +1,11 @@
-import { IsString, IsArray, IsOptional, IsNumber, IsBoolean, ArrayMinSize } from 'class-validator';
+import {
+  IsString,
+  IsArray,
+  IsOptional,
+  IsNumber,
+  IsBoolean,
+  ArrayMinSize,
+} from 'class-validator';
 
 export class SendPollDto {
   @IsString()

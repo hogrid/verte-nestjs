@@ -24,7 +24,10 @@ export class CreateCampaignDto {
   @IsOptional()
   public_id?: number | string; // Can be number or 'new' for default public
 
-  @IsDateString({}, { message: 'O campo schedule_date deve ser uma data válida.' })
+  @IsDateString(
+    {},
+    { message: 'O campo schedule_date deve ser uma data válida.' },
+  )
   @IsOptional()
   schedule_date?: string;
 

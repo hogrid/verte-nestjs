@@ -362,9 +362,9 @@ describe('WhatsApp Webhooks (e2e) - WAHA Event Processing', () => {
     testPublicByContact = pbc || {};
 
     const numberRepository = dataSource.getRepository(Number);
-    testNumber = (await numberRepository.findOne({
+    testNumber = await numberRepository.findOne({
       where: { id: testNumber.id },
-    })) as Number;
+    });
   }
 
   /**

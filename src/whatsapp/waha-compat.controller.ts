@@ -70,7 +70,11 @@ export class LegacyCompatController {
     if (!res.qrcode && !res.base64) {
       throw new NotFoundException('Sessão não encontrada');
     }
-    return { qr: res.qrcode || res.base64, instance: body.session, status: 'SCAN_QR_CODE' };
+    return {
+      qr: res.qrcode || res.base64,
+      instance: body.session,
+      status: 'SCAN_QR_CODE',
+    };
   }
 
   @Get('waha/sessions/:sessionName')
@@ -102,7 +106,8 @@ export class LegacyCompatController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Desconectar sessão (Legacy compat)',
-    description: 'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
+    description:
+      'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
   })
   @ApiBody({
     schema: { type: 'object', properties: { session: { type: 'string' } } },
@@ -110,7 +115,10 @@ export class LegacyCompatController {
   @ApiResponse({ status: 200, description: 'Sessão desconectada' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
-  async disconnect(@Request() req: { user: { id: number } }, @Body() body: InstanceDisconnectDto) {
+  async disconnect(
+    @Request() req: { user: { id: number } },
+    @Body() body: InstanceDisconnectDto,
+  ) {
     if (!body.session) {
       throw new BadRequestException('Nome da sessão é obrigatório');
     }
@@ -151,7 +159,8 @@ export class LegacyCompatController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Desconectar sessão (Novo endpoint)',
-    description: 'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
+    description:
+      'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
   })
   @ApiBody({
     schema: { type: 'object', properties: { session: { type: 'string' } } },
@@ -159,7 +168,10 @@ export class LegacyCompatController {
   @ApiResponse({ status: 200, description: 'Sessão desconectada' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Sessão não encontrada' })
-  async disconnectWhatsapp(@Request() req: { user: { id: number } }, @Body() body: InstanceDisconnectDto) {
+  async disconnectWhatsapp(
+    @Request() req: { user: { id: number } },
+    @Body() body: InstanceDisconnectDto,
+  ) {
     // Chama o mesmo método do endpoint antigo para manter compatibilidade
     return this.disconnect(req, body);
   }
@@ -170,13 +182,17 @@ export class LegacyCompatController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Desconectar sessão WhatsApp (logout)',
-    description: 'Desconeta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
+    description:
+      'Desconeta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
   })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        instanceName: { type: 'string', description: 'Nome da instância a desconectar' },
+        instanceName: {
+          type: 'string',
+          description: 'Nome da instância a desconectar',
+        },
       },
     },
   })
@@ -232,13 +248,17 @@ export class LegacyCompatController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Desconectar sessão WhatsApp (logout) - Novo endpoint',
-    description: 'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
+    description:
+      'Desconecta a sessão WhatsApp do usuário autenticado. Usa logout em vez de deletar a instância.',
   })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        instanceName: { type: 'string', description: 'Nome da instância a desconectar' },
+        instanceName: {
+          type: 'string',
+          description: 'Nome da instância a desconectar',
+        },
       },
     },
   })

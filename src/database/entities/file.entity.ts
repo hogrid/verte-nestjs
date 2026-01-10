@@ -18,7 +18,12 @@ export class File {
   @Column({ type: 'varchar', length: 255, nullable: true })
   name: string | null;
 
-  @Column({ name: 'original_name', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'original_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   original_name: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

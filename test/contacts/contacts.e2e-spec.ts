@@ -628,7 +628,7 @@ describe('Contacts Module (E2E)', () => {
     // Create test contacts for export tests
     beforeAll(async () => {
       const contactRepository = dataSource.getRepository(Contact);
-      const normalizedCel = NumberHelper.formatNumber(testNumber.cel!);
+      const normalizedCel = NumberHelper.formatNumber(testNumber.cel);
 
       // Create 3 active test contacts for export (2 with label_id=1, 1 without)
       const testContacts = [

@@ -103,7 +103,13 @@ export class CampaignsService {
         .leftJoin('campaigns.public', 'public')
         .addSelect(['public.id', 'public.name', 'public.status'])
         .leftJoin('campaigns.messages', 'messages')
-        .addSelect(['messages.id', 'messages.message', 'messages.type', 'messages.order', 'messages.media'])
+        .addSelect([
+          'messages.id',
+          'messages.message',
+          'messages.type',
+          'messages.order',
+          'messages.media',
+        ])
         .leftJoin('campaigns.number', 'number')
         .addSelect(['number.id', 'number.name', 'number.cel', 'number.status']);
 
@@ -152,7 +158,7 @@ export class CampaignsService {
           }
         } catch (error: unknown) {
           this.logger.warn('⚠️ Erro ao parsear filterFields', {
-            error: error instanceof Error ? error.message : String(error),
+            error: error instanceof Error ? error.message : 'Unknown error',
           });
         }
       }
@@ -194,7 +200,7 @@ export class CampaignsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao listar campanhas', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
@@ -339,7 +345,9 @@ export class CampaignsService {
       });
 
       if (messages.length === 0) {
-        this.logger.warn('⚠️ Nenhuma mensagem fornecida, criando mensagem padrão');
+        this.logger.warn(
+          '⚠️ Nenhuma mensagem fornecida, criando mensagem padrão',
+        );
         // Create default empty message if none provided
         const defaultMessage = this.messageRepository.create({
           campaign_id: savedCampaign.id,
@@ -428,10 +436,16 @@ export class CampaignsService {
         }
       } catch (queueError) {
         // Log but don't fail - campaign was created successfully
-        this.logger.warn('⚠️ Não foi possível enfileirar job (Redis indisponível?)', {
-          campaign_id: savedCampaign.id,
-          error: queueError instanceof Error ? queueError.message : String(queueError),
-        });
+        this.logger.warn(
+          '⚠️ Não foi possível enfileirar job (Redis indisponível?)',
+          {
+            campaign_id: savedCampaign.id,
+            error:
+              queueError instanceof Error
+                ? queueError.message
+                : String(queueError),
+          },
+        );
       }
 
       this.logger.log('🎉 Campanha criada com sucesso', {
@@ -441,7 +455,7 @@ export class CampaignsService {
       return savedCampaign;
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao criar campanha', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
@@ -610,7 +624,7 @@ export class CampaignsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao listar contatos', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -658,7 +672,7 @@ export class CampaignsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao buscar público', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -756,7 +770,7 @@ export class CampaignsService {
       } as any;
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao criar público simplificado', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -789,7 +803,7 @@ export class CampaignsService {
       return { message: 'Público simplificado atualizado com sucesso.' };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao atualizar público simplificado', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -881,7 +895,7 @@ export class CampaignsService {
       return { id: saved.id, file_path: saved.file, public_id: dto.id };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao criar público customizado', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -913,7 +927,7 @@ export class CampaignsService {
       return { message: 'Público customizado atualizado com sucesso.' };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao atualizar público customizado', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -1039,7 +1053,7 @@ export class CampaignsService {
       } as any;
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao criar público por etiquetas', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -1074,7 +1088,7 @@ export class CampaignsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao verificar campanhas', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -1118,7 +1132,7 @@ export class CampaignsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao cancelar campanhas', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -1185,9 +1199,12 @@ export class CampaignsService {
 
       // Se a campanha foi retomada (de pausado para ativo), enfileirar para processamento
       if (currentStatus === 1 && newStatus === 0) {
-        this.logger.log('📤 Campanha retomada - enfileirando para processamento', {
-          campaignId,
-        });
+        this.logger.log(
+          '📤 Campanha retomada - enfileirando para processamento',
+          {
+            campaignId,
+          },
+        );
 
         const job = await this.campaignsQueue.add(
           'process-campaign',
@@ -1222,7 +1239,7 @@ export class CampaignsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao alterar status', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }
@@ -1262,7 +1279,7 @@ export class CampaignsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao buscar público customizado', {
-        error: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
       throw error;
     }

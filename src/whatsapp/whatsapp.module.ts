@@ -53,7 +53,12 @@ import { PublicByContact } from '../database/entities/public-by-contact.entity';
   imports: [
     ConfigModule,
     ContactsModule,
-    TypeOrmModule.forFeature([Number, MessageByContact, PublicByContact, Campaign]),
+    TypeOrmModule.forFeature([
+      Number,
+      MessageByContact,
+      PublicByContact,
+      Campaign,
+    ]),
   ],
   controllers: [WhatsappController, LegacyCompatController],
   providers: [

@@ -104,7 +104,12 @@ export class PaymentsService {
       return result;
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao criar checkout session', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
@@ -142,7 +147,12 @@ export class PaymentsService {
       return { received: true };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar webhook', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -191,7 +201,12 @@ export class PaymentsService {
       }
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar checkout completed', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
     }
   }
@@ -225,7 +240,12 @@ export class PaymentsService {
       });
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar payment succeeded', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
     }
   }
@@ -257,7 +277,12 @@ export class PaymentsService {
       });
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar payment failed', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
     }
   }
@@ -298,7 +323,12 @@ export class PaymentsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar payment success', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -331,7 +361,12 @@ export class PaymentsService {
       };
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao processar payment cancel', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }

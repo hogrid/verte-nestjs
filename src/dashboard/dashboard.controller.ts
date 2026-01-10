@@ -43,7 +43,10 @@ export class DashboardController {
     @Request() req: { user: { id: number } },
     @Query('limit') limit?: number,
   ) {
-    const data = await this.dashboardService.getRecentActivity(req.user.id, limit);
+    const data = await this.dashboardService.getRecentActivity(
+      req.user.id,
+      limit,
+    );
     return { data };
   }
 

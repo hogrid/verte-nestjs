@@ -84,9 +84,9 @@ describe('Evolution API Webhooks (e2e)', () => {
   });
 
   const reloadEntities = async () => {
-    testNumber = (await numberRepository.findOne({
+    testNumber = await numberRepository.findOne({
       where: { id: testNumber.id },
-    })) as Number;
+    });
   };
 
   it('should process connection.update (open) and trigger contact sync', async () => {

@@ -20,7 +20,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {
-    const secret = configService.get<string>('JWT_SECRET') || 'default-secret-change-me';
+    const secret =
+      configService.get<string>('JWT_SECRET') || 'default-secret-change-me';
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,

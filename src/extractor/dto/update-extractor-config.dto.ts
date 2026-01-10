@@ -1,4 +1,10 @@
-import { IsOptional, IsNumber, IsString, IsBoolean, IsArray } from 'class-validator';
+import {
+  IsOptional,
+  IsNumber,
+  IsString,
+  IsBoolean,
+  IsArray,
+} from 'class-validator';
 
 export class UpdateExtractorConfigDto {
   @IsNumber()

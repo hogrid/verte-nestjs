@@ -597,32 +597,39 @@ export class UtilitiesController {
         redis_connected: true,
         queues: {
           campaigns: { waiting: 0, active: 0, completed: 10, failed: 0 },
-          'whatsapp-message': { waiting: 5, active: 2, completed: 100, failed: 3 },
+          'whatsapp-message': {
+            waiting: 5,
+            active: 2,
+            completed: 100,
+            failed: 3,
+          },
         },
       },
     },
   })
   async getQueueStatus() {
-    const queuesAvailable = !!this.campaignsQueue && !!this.whatsappMessageQueue;
+    const queuesAvailable =
+      !!this.campaignsQueue && !!this.whatsappMessageQueue;
 
     if (!queuesAvailable) {
       return {
         redis_connected: false,
-        message: 'Queues não disponíveis - Redis pode estar offline ou MOCK_BULL=1',
+        message:
+          'Queues não disponíveis - Redis pode estar offline ou MOCK_BULL=1',
         timestamp: new Date().toISOString(),
       };
     }
 
     try {
       const [campaignsStatus, messagesStatus] = await Promise.all([
-        this.campaignsQueue!.getJobCounts(),
-        this.whatsappMessageQueue!.getJobCounts(),
+        this.campaignsQueue.getJobCounts(),
+        this.whatsappMessageQueue.getJobCounts(),
       ]);
 
       // Tentar buscar jobs ativos para mais detalhes
       const [activeJobs, waitingJobs] = await Promise.all([
-        this.campaignsQueue!.getActive(),
-        this.campaignsQueue!.getWaiting(),
+        this.campaignsQueue.getActive(),
+        this.campaignsQueue.getWaiting(),
       ]);
 
       return {

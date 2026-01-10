@@ -12,7 +12,12 @@ import type { Job, Queue } from 'bull';
 import { Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Campaign, Contact, Message, MessageByContact } from '../../database/entities';
+import {
+  Campaign,
+  Contact,
+  Message,
+  MessageByContact,
+} from '../../database/entities';
 import { QUEUE_NAMES, advancedRetryConfig } from '../../config/redis.config';
 import type { WhatsAppMessageJob } from './whatsapp-message.processor';
 
@@ -42,28 +47,38 @@ export class CampaignsProcessor {
 
   @OnQueueActive()
   onActive(job: Job<CampaignJob>) {
-    this.logger.log(`📌 [QUEUE] Job ${job.id} ativado - Campanha #${job.data.campaignId}`);
+    this.logger.log(
+      `📌 [QUEUE] Job ${job.id} ativado - Campanha #${job.data.campaignId}`,
+    );
   }
 
   @OnQueueCompleted()
   onCompleted(job: Job<CampaignJob>, result: unknown) {
-    this.logger.log(`✅ [QUEUE] Job ${job.id} completado - Campanha #${job.data.campaignId}`, {
-      result,
-    });
+    this.logger.log(
+      `✅ [QUEUE] Job ${job.id} completado - Campanha #${job.data.campaignId}`,
+      {
+        result,
+      },
+    );
   }
 
   @OnQueueFailed()
   onFailed(job: Job<CampaignJob>, error: Error) {
-    this.logger.error(`❌ [QUEUE] Job ${job.id} falhou - Campanha #${job.data.campaignId}`, {
-      error: error.message,
-      stack: error.stack,
-      attempts: job.attemptsMade,
-    });
+    this.logger.error(
+      `❌ [QUEUE] Job ${job.id} falhou - Campanha #${job.data.campaignId}`,
+      {
+        error: error.message,
+        stack: error.stack,
+        attempts: job.attemptsMade,
+      },
+    );
   }
 
   @OnQueueStalled()
   onStalled(job: Job<CampaignJob>) {
-    this.logger.warn(`⚠️ [QUEUE] Job ${job.id} travou (stalled) - Campanha #${job.data.campaignId}`);
+    this.logger.warn(
+      `⚠️ [QUEUE] Job ${job.id} travou (stalled) - Campanha #${job.data.campaignId}`,
+    );
   }
 
   @OnQueueError()
@@ -118,11 +133,15 @@ export class CampaignsProcessor {
       // Se não encontrou com public_id específico, buscar contatos sem public_id (sincronizados)
       // Isso funciona para públicos "Todos os Contatos"
       if (contacts.length === 0) {
-        this.logger.log('🔄 Buscando contatos sem public_id (sincronizados do WhatsApp)...');
+        this.logger.log(
+          '🔄 Buscando contatos sem public_id (sincronizados do WhatsApp)...',
+        );
         contacts = await this.contactRepository
           .createQueryBuilder('contact')
           .where('contact.user_id = :userId', { userId: campaign.user_id })
-          .andWhere('contact.number_id = :numberId', { numberId: campaign.number_id })
+          .andWhere('contact.number_id = :numberId', {
+            numberId: campaign.number_id,
+          })
           .andWhere('contact.status = :status', { status: 1 })
           .andWhere('contact.public_id IS NULL')
           .getMany();
@@ -131,12 +150,19 @@ export class CampaignsProcessor {
       this.logger.log(`📋 ${contacts.length} contatos encontrados para envio`);
 
       if (contacts.length === 0) {
-        this.logger.warn(`⚠️ Nenhum contato ativo encontrado para campanha #${campaignId}`);
+        this.logger.warn(
+          `⚠️ Nenhum contato ativo encontrado para campanha #${campaignId}`,
+        );
         await this.campaignRepository.update(campaignId, {
           status: 2, // Completada (sem contatos)
           progress: 100,
         });
-        return { success: true, campaignId, contactsCount: 0, messagesEnqueued: 0 };
+        return {
+          success: true,
+          campaignId,
+          contactsCount: 0,
+          messagesEnqueued: 0,
+        };
       }
 
       // 4. Ordenar mensagens por order
@@ -145,16 +171,24 @@ export class CampaignsProcessor {
       );
 
       if (messages.length === 0) {
-        this.logger.warn(`⚠️ Nenhuma mensagem encontrada para campanha #${campaignId}`);
+        this.logger.warn(
+          `⚠️ Nenhuma mensagem encontrada para campanha #${campaignId}`,
+        );
         await this.campaignRepository.update(campaignId, {
           status: 2,
           progress: 100,
         });
-        return { success: true, campaignId, contactsCount: contacts.length, messagesEnqueued: 0 };
+        return {
+          success: true,
+          campaignId,
+          contactsCount: contacts.length,
+          messagesEnqueued: 0,
+        };
       }
 
       // 5. Obter instância do WhatsApp
-      const instanceName = campaign.number?.instance || `instance_${campaign.number_id}`;
+      const instanceName =
+        campaign.number?.instance || `instance_${campaign.number_id}`;
       this.logger.log(`📱 Usando instância WhatsApp: ${instanceName}`);
 
       // 6. Enfileirar job de mensagem para cada contato/mensagem
@@ -173,7 +207,8 @@ export class CampaignsProcessor {
             read: 0,
             has_error: 0,
           });
-          const savedMBC = await this.messageByContactRepository.save(messageByContact);
+          const savedMBC =
+            await this.messageByContactRepository.save(messageByContact);
 
           // Determinar tipo de mídia
           let mediaType: 'image' | 'video' | 'audio' | 'document' | undefined;
@@ -190,10 +225,10 @@ export class CampaignsProcessor {
               campaignId: campaign.id,
               instanceName,
               phone: contact.number || '',
-              text: !mediaType ? (message.message || '') : undefined,
+              text: !mediaType ? message.message || '' : undefined,
               mediaUrl: message.media || undefined,
               mediaType,
-              caption: mediaType ? (message.message || undefined) : undefined,
+              caption: mediaType ? message.message || undefined : undefined,
             },
             {
               ...advancedRetryConfig.messages,

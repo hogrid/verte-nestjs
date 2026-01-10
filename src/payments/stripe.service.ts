@@ -30,7 +30,7 @@ export class StripeService {
         apiVersion: '2025-10-29.clover',
       });
     } else {
-      this.stripe = new Stripe(stripeSecretKey as string, {
+      this.stripe = new Stripe(stripeSecretKey, {
         apiVersion: '2025-10-29.clover',
       });
     }
@@ -100,7 +100,12 @@ export class StripeService {
       return session;
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao criar sessão de checkout', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -165,7 +170,12 @@ export class StripeService {
       return event;
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao validar webhook', {
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -197,7 +207,12 @@ export class StripeService {
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao recuperar sessão', {
         sessionId,
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }
@@ -230,7 +245,12 @@ export class StripeService {
     } catch (error: unknown) {
       this.logger.error('❌ Erro ao recuperar payment intent', {
         paymentIntentId,
-        error: error instanceof Error ? error.message : String(error),
+        error:
+          error instanceof Error
+            ? error.message
+            : typeof error === 'string'
+              ? error
+              : JSON.stringify(error),
       });
       throw error;
     }

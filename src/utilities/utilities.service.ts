@@ -187,7 +187,9 @@ export class UtilitiesService {
       },
     });
 
-    this.logger.log(`📊 Total de contatos para user ${userId}: ${totalContacts}`);
+    this.logger.log(
+      `📊 Total de contatos para user ${userId}: ${totalContacts}`,
+    );
 
     const activeContacts = await this.contactRepository.count({
       where: {
@@ -200,14 +202,13 @@ export class UtilitiesService {
     // Contar públicos em campanhas (campaign_publics)
     // NOTA: Campaign tem relação 'public' (singular), não 'publics'
     // Vamos contar campanhas que têm público associado
-    const campaignPublicsCount = await this.campaignRepository
-      .count({
-        where: {
-          user_id: userId,
-          public_id: Not(IsNull()), // Conta campanhas que têm público associado (NOT IsNull)
-          deleted_at: IsNull(),
-        },
-      });
+    const campaignPublicsCount = await this.campaignRepository.count({
+      where: {
+        user_id: userId,
+        public_id: Not(IsNull()), // Conta campanhas que têm público associado (NOT IsNull)
+        deleted_at: IsNull(),
+      },
+    });
 
     const result = {
       total_contacts: totalContacts,

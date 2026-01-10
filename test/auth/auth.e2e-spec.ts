@@ -477,12 +477,12 @@ describe('Auth Module (e2e) - Laravel Compatibility Tests', () => {
       const user = await userRepository.findOne({
         where: { email: 'test@verte.com' },
       });
-      const isValid = await bcrypt.compare('newpassword123', user!.password);
+      const isValid = await bcrypt.compare('newpassword123', user.password);
       expect(isValid).toBe(true);
 
       // Reset password back for other tests
-      user!.password = await bcrypt.hash('password123', 10);
-      await userRepository.save(user!);
+      user.password = await bcrypt.hash('password123', 10);
+      await userRepository.save(user);
     });
 
     it('Step 2: should validate password confirmation', async () => {

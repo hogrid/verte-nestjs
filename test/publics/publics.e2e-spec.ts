@@ -259,7 +259,7 @@ describe('Publics (E2E)', () => {
         where: { id: anotherPublic.id },
       });
       expect(updated).not.toBeNull();
-      expect(updated!.status).toBe(0);
+      expect(updated.status).toBe(0);
 
       // Cleanup
       await dataSource.getRepository(Public).delete({ id: anotherPublic.id });
@@ -437,7 +437,7 @@ describe('Publics (E2E)', () => {
       });
 
       expect(deleted).not.toBeNull();
-      expect(deleted!.deleted_at).not.toBeNull();
+      expect(deleted.deleted_at).not.toBeNull();
 
       // Cleanup
       await dataSource.getRepository(Public).delete({ id: publicToDelete.id });

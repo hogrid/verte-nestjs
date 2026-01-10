@@ -40,7 +40,12 @@ export class Campaign {
   @Column({ name: 'schedule_date', type: 'timestamp', nullable: true })
   schedule_date: Date | null;
 
-  @Column({ name: 'total_interactions', type: 'int', nullable: true, default: 0 })
+  @Column({
+    name: 'total_interactions',
+    type: 'int',
+    nullable: true,
+    default: 0,
+  })
   total_interactions: number | null;
 
   @Column({ name: 'total_read', type: 'int', nullable: true, default: 0 })
@@ -70,7 +75,12 @@ export class Campaign {
   @Column({ type: 'tinyint', nullable: true, default: 0 })
   canceled: number | null;
 
-  @Column({ name: 'processed_contacts', type: 'int', nullable: true, default: 0 })
+  @Column({
+    name: 'processed_contacts',
+    type: 'int',
+    nullable: true,
+    default: 0,
+  })
   processed_contacts: number | null;
 
   @Column({ type: 'text', nullable: true })
