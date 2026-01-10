@@ -1,0 +1,77 @@
+# ===========================================
+# DOCKER COMPOSE - SERVIÇOS AUXILIARES
+# ===========================================
+# Este arquivo contém apenas os serviços de infraestrutura
+# que precisam rodar junto com o backend NestJS
+#
+# No Coolify: Crie uma aplicação do tipo "Docker Compose"
+# e cole este conteúdo, ou execute manualmente no servidor
+# ===========================================
+
+services:
+  # Evolution API - WhatsApp (QR Code, envio de mensagens)
+  evolution-api:
+    container_name: evolution_api
+    image: evoapicloud/evolution-api:latest
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://localhost:8080
+      - CORS_ORIGIN=*
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-change-me-to-secure-api-key}
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/evolution
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379
+      - QRCODE_LIMIT=30
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - VerteApp
+
+  # PostgreSQL para o Evolution API
+  postgres:
+    container_name: evolution_postgres
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=evolution
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - VerteApp
+
+  # Redis para cache e filas
+  redis:
+    container_name: evolution_redis
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - VerteApp
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  evolution_instances:
+    driver: local
+  evolution_store:
+    driver: local
+
+networks:
+  VerteApp:
+    external: true
+    name: VerteApp
