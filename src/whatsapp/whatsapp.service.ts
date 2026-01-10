@@ -639,6 +639,42 @@ export class WhatsappService {
   }
 
   /**
+   * Get user's main WhatsApp number (compatibility with frontend)
+   */
+  async getMyNumber(userId: number) {
+    this.logger.log('📱 Buscando número principal', { userId });
+
+    try {
+      const number = await this.numberRepository.findOne({
+        where: { user_id: userId, status: 1 },
+      });
+
+      if (!number) {
+        throw new NotFoundException('Nenhum número encontrado');
+      }
+
+      // Mapear status para o formato esperado pelo frontend
+      const statusMap = {
+        0: 'DISCONNECTED',
+        1: 'CONNECTED',
+      };
+
+      return {
+        id: number.id,
+        instanceName: number.instance,
+        cel: number.cel,
+        status: statusMap[number.status_connection] || 'DISCONNECTED',
+        connected: number.status_connection === 1,
+      };
+    } catch (error: unknown) {
+      this.logger.error('❌ Erro ao buscar número principal', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Show number details
    */
   async showNumber(userId: number, numberId: number) {

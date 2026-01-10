@@ -153,6 +153,35 @@ export class WhatsappController {
   }
 
   /**
+   * GET /api/v1/whatsapp/my-number
+   * Obtém o número WhatsApp principal do usuário (compatibilidade com frontend)
+   */
+  @Get('whatsapp/my-number')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Obter número WhatsApp principal',
+    description: 'Retorna o número WhatsApp principal do usuário (para página de configuração)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Número retornado',
+    schema: {
+      example: {
+        id: 1,
+        instanceName: 'user_123_whatsapp',
+        cel: '+5511999999999',
+        status: 'CONNECTED',
+        connected: true,
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Nenhum número encontrado' })
+  async getMyNumber(@Request() req: { user: { id: number } }) {
+    return this.whatsappService.getMyNumber(req.user.id);
+  }
+
+  /**
    * 2. GET /api/v1/whatsapp/status
    * Verificar status de conexão WhatsApp
    */
