@@ -157,7 +157,7 @@ export class AuthService {
     const savedUser = await this.userRepository.save(user);
 
     // Generate instance name based on phone number
-    const cleanPhone = registerDto.cel.replace(/\D/g, '');
+    const cleanPhone = (registerDto.cel || '').replace(/\D/g, '');
     let instanceName = `RECUPERANOME_${savedUser.id}`;
 
     if (cleanPhone.length >= 11) {
