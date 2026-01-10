@@ -25,10 +25,10 @@ export class Contact {
   @Column({ name: 'user_id', type: 'bigint', unsigned: true })
   user_id: number;
 
-  @Column({ name: 'public_id', type: 'int', nullable: true })
+  @Column({ name: 'public_id', type: 'bigint', unsigned: true, nullable: true })
   public_id: number | null;
 
-  @Column({ name: 'number_id', type: 'int', nullable: true })
+  @Column({ name: 'number_id', type: 'bigint', unsigned: true, nullable: true })
   number_id: number | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })

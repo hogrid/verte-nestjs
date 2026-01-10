@@ -24,7 +24,7 @@ export class Publics {
   @Column({ name: 'user_id', type: 'bigint', unsigned: true })
   user_id: number;
 
-  @Column({ name: 'number_id', type: 'int', nullable: true })
+  @Column({ name: 'number_id', type: 'bigint', unsigned: true, nullable: true })
   number_id: number | null;
 
   @Column({ type: 'varchar', length: 200 })

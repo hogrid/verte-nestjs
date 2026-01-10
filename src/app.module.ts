@@ -46,7 +46,7 @@ import { SeederModule } from './seeder/seeder.module';
         password: configService.get('DB_PASSWORD', 'root'),
         database: configService.get('DB_DATABASE', 'verte_production'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: false, // CRITICAL: Never sync - use existing Laravel tables
+        synchronize: false,
         charset: 'utf8mb4',
         timezone: '+00:00',
         logging:

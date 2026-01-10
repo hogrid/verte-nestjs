@@ -44,7 +44,7 @@ export class User {
   @Column({ name: 'stripe_id', type: 'varchar', length: 255, nullable: true })
   stripe_id: string | null;
 
-  @Column({ name: 'plan_id', type: 'int', nullable: true })
+  @Column({ name: 'plan_id', type: 'bigint', unsigned: true, nullable: true })
   plan_id: number | null;
 
   @Column({ type: 'varchar', length: 255 })

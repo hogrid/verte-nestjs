@@ -19,7 +19,7 @@ export class PublicByContact {
   @PrimaryGeneratedColumn({ type: 'bigint', unsigned: true })
   id: number;
 
-  @Column({ name: 'campaign_id', type: 'int', nullable: true })
+  @Column({ name: 'campaign_id', type: 'bigint', unsigned: true, nullable: true })
   campaign_id: number | null;
 
   @Column({ name: 'user_id', type: 'bigint', unsigned: true })
